@@ -1,0 +1,48 @@
+name: CD
+
+on:
+  push:
+    branches: [ dev ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Build frontend image
+      run: docker build -t gamer-nexus-frontend:latest ./frontend
+
+    - name: Build backend image
+      run: docker build -t gamer-nexus-backend:latest ./backend
+
+    - name: Save Docker images to .tar files
+      run: |
+        docker save -o frontend.tar gamer-nexus-frontend:latest
+        docker save -o backend.tar gamer-nexus-backend:latest
+
+    - name: Set up SSH key
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H ${{ secrets.ORACLE_VM_IP }} >> ~/.ssh/known_hosts
+
+    - name: Copy files to VM
+      run: scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa docker-compose.yml frontend.tar backend.tar ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }}:~/
+
+    - name: Deploy on VM
+      run: |
+        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }} << 'EOF'
+          # Load images from .tar files
+          docker load < frontend.tar
+          docker load < backend.tar
+          
+          # Stop and remove old containers, then start new ones
+          docker-compose down
+          docker-compose up -d
+          
+          # Clean up the .tar files
+          rm frontend.tar backend.tar
+        EOF
