@@ -36,12 +36,24 @@ jobs:
       run: |
         ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }} << 'EOF'
           # Load images from .tar files
+          echo "Loading frontend image..."
           docker load < frontend.tar
+          echo "Loading backend image..."
           docker load < backend.tar
           
+          # List loaded images
+          echo "Available images:"
+          docker images
+          
           # Stop and remove old containers, then start new ones
-          docker-compose down
-          docker-compose up -d
+          echo "Stopping old containers..."
+          docker compose down
+          echo "Starting new containers..."
+          docker compose up -d
+          
+          # Check container status
+          echo "Container status:"
+          docker compose ps
           
           # Clean up the .tar files
           rm frontend.tar backend.tar
