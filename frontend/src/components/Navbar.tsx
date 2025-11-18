@@ -4,31 +4,57 @@ const Navbar = () => {
   const navItems = [
     { name: "Min-Max build", href: "#" },
     { name: "Game Deals", href: "#" },
-    { name: "Hardware deals", href: "#" },
-    { name: "Best accessories", href: "#" },
+    { name: "Hardware Deals", href: "#" },
+    { name: "Best Accessories", href: "#" },
   ];
 
   return (
     <nav className="bg-black text-white border-b border-red-600">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="w-full px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <div className="flex-shrink-0 font-bold text-xl tracking-wider text-red-600">
-            FOR GAMERS
+          {/* Left Section: Logo & Nav */}
+          <div className="flex items-center">
+            <div className="shrink-0 font-bold text-xl tracking-wider text-red-600 mr-8">
+              FOR GAMERS
+            </div>
+            <div className="hidden md:block">
+              <div className="flex items-baseline space-x-4">
+                {navItems.map((item) => (
+                  <a
+                    key={item.name}
+                    href={item.href}
+                    className="hover:bg-red-600 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200"
+                  >
+                    {item.name}
+                  </a>
+                ))}
+              </div>
+            </div>
           </div>
 
-          {/* Desktop Menu */}
-          <div className="hidden md:block">
-            <div className="ml-10 flex items-baseline space-x-4">
-              {navItems.map((item) => (
-                <a
-                  key={item.name}
-                  href={item.href}
-                  className="hover:bg-red-600 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200"
-                >
-                  {item.name}
-                </a>
-              ))}
+          {/* Right Section: Search & Login */}
+          <div className="flex items-center justify-end flex-1">
+            {/* Search Bar */}
+            <div className="max-w-md w-full mx-4 hidden md:block">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-700 rounded-md leading-5 bg-gray-900 text-gray-300 placeholder-gray-400 focus:outline-none focus:bg-black focus:border-red-600 focus:ring-1 focus:ring-red-600 sm:text-sm"
+                  placeholder="Search for games or hardware"
+                />
+              </div>
+            </div>
+
+            {/* Login/Signup */}
+            <div className="hidden md:flex items-center">
+              <button className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200">
+                Login / Sign Up
+              </button>
             </div>
           </div>
 
