@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ProductCard from './ProductCard';
 
 interface Product {
   id: number;
@@ -10,6 +11,7 @@ interface Product {
   discount: string;
   rating: number;
   brand?: string;
+  description: string;
 }
 
 const dummyProducts: Product[] = [
@@ -22,7 +24,8 @@ const dummyProducts: Product[] = [
     category: "Game",
     discount: "-50%",
     rating: 4.5,
-    brand: "CD Projekt Red"
+    brand: "CD Projekt Red",
+    description: "An open-world, action-adventure story set in Night City, a megalopolis obsessed with power, glamour and body modification."
   },
   {
     id: 2,
@@ -33,7 +36,8 @@ const dummyProducts: Product[] = [
     category: "Hardware",
     discount: "-11%",
     rating: 4.8,
-    brand: "NVIDIA"
+    brand: "NVIDIA",
+    description: "The GeForce RTX 4070 Ti delivers the ultra performance and features that enthusiast gamers and creators demand."
   },
   {
     id: 3,
@@ -44,7 +48,8 @@ const dummyProducts: Product[] = [
     category: "Game",
     discount: "-33%",
     rating: 5.0,
-    brand: "FromSoftware"
+    brand: "FromSoftware",
+    description: "A fantasy action-RPG adventure set within a world created by Hidetaka Miyazaki and George R.R. Martin."
   },
   {
     id: 4,
@@ -55,7 +60,8 @@ const dummyProducts: Product[] = [
     category: "Hardware",
     discount: "-45%",
     rating: 4.6,
-    brand: "Logitech"
+    brand: "Logitech",
+    description: "Engineered for pro-grade performance, responsiveness, and durability. The ultimate weapon for your gaming arsenal."
   },
   {
     id: 5,
@@ -66,7 +72,8 @@ const dummyProducts: Product[] = [
     category: "Game",
     discount: "-15%",
     rating: 4.9,
-    brand: "Sony"
+    brand: "Sony",
+    description: "His vengeance against the Gods of Olympus years behind him, Kratos now lives as a man in the realm of Norse Gods and monsters."
   },
   {
     id: 6,
@@ -77,7 +84,8 @@ const dummyProducts: Product[] = [
     category: "Hardware",
     discount: "-20%",
     rating: 4.7,
-    brand: "Corsair"
+    brand: "Corsair",
+    description: "The iconic mechanical gaming keyboard with an aircraft-grade aluminum frame and dynamic RGB backlighting."
   },
   {
     id: 7,
@@ -88,7 +96,8 @@ const dummyProducts: Product[] = [
     category: "Hardware",
     discount: "-10%",
     rating: 4.8,
-    brand: "Microsoft"
+    brand: "Microsoft",
+    description: "The fastest, most powerful Xbox ever. Explore rich new worlds with 12 teraflops of raw graphic processing power."
   },
   {
     id: 8,
@@ -99,7 +108,8 @@ const dummyProducts: Product[] = [
     category: "Hardware",
     discount: "0%",
     rating: 4.9,
-    brand: "Sony"
+    brand: "Sony",
+    description: "Experience lightning fast loading with an ultra-high speed SSD, deeper immersion with haptic feedback, and 3D Audio."
   },
   {
     id: 9,
@@ -110,7 +120,8 @@ const dummyProducts: Product[] = [
     category: "Hardware",
     discount: "0%",
     rating: 4.7,
-    brand: "Nintendo"
+    brand: "Nintendo",
+    description: "Play at home on the TV or on-the-go with a vibrant 7-inch OLED screen with the Nintendo Switch – OLED Model system."
   },
   {
     id: 10,
@@ -121,7 +132,8 @@ const dummyProducts: Product[] = [
     category: "Game",
     discount: "-50%",
     rating: 4.9,
-    brand: "CD Projekt Red"
+    brand: "CD Projekt Red",
+    description: "You are Geralt of Rivia, mercenary monster slayer. Before you stands a war-torn, monster-infested continent you can explore at will."
   },
   {
     id: 11,
@@ -132,7 +144,8 @@ const dummyProducts: Product[] = [
     category: "Game",
     discount: "-50%",
     rating: 4.9,
-    brand: "Rockstar Games"
+    brand: "Rockstar Games",
+    description: "Winner of over 175 Game of the Year Awards and recipient of over 250 perfect scores, RDR2 is an epic tale of honor and loyalty."
   },
   {
     id: 12,
@@ -143,7 +156,8 @@ const dummyProducts: Product[] = [
     category: "Game",
     discount: "-14%",
     rating: 4.6,
-    brand: "Warner Bros"
+    brand: "Warner Bros",
+    description: "Hogwarts Legacy is an immersive, open-world action RPG set in the world first introduced in the Harry Potter books."
   },
   {
     id: 13,
@@ -154,7 +168,8 @@ const dummyProducts: Product[] = [
     category: "Hardware",
     discount: "-20%",
     rating: 4.4,
-    brand: "Razer"
+    brand: "Razer",
+    description: "Immersive 7.1 surround sound for positional audio. Ultra-lightweight design for prolonged gaming marathons."
   },
   {
     id: 14,
@@ -165,7 +180,8 @@ const dummyProducts: Product[] = [
     category: "Hardware",
     discount: "-20%",
     rating: 4.7,
-    brand: "LG"
+    brand: "LG",
+    description: "Experience your games in stunning 4K resolution with a 144Hz refresh rate and 1ms response time for competitive gaming."
   },
   {
     id: 15,
@@ -176,7 +192,8 @@ const dummyProducts: Product[] = [
     category: "Hardware",
     discount: "-19%",
     rating: 4.8,
-    brand: "Samsung"
+    brand: "Samsung",
+    description: "Reach max performance of PCIe 4.0. Experience longer-lasting, opponent-blasting speed. The smart heat control delivers power efficiency."
   },
   {
     id: 16,
@@ -187,7 +204,8 @@ const dummyProducts: Product[] = [
     category: "Hardware",
     discount: "-21%",
     rating: 4.7,
-    brand: "G.Skill"
+    brand: "G.Skill",
+    description: "Push the limits of performance with DDR5 memory. Faster frequencies, greater capacities, and better performance."
   },
   {
     id: 17,
@@ -198,7 +216,8 @@ const dummyProducts: Product[] = [
     category: "Hardware",
     discount: "-20%",
     rating: 4.3,
-    brand: "Secretlab"
+    brand: "Secretlab",
+    description: "Ergonomic design for all-day comfort. Features adjustable lumbar support, 4D armrests, and premium PU leather."
   },
   {
     id: 18,
@@ -209,7 +228,8 @@ const dummyProducts: Product[] = [
     category: "Hardware",
     discount: "-25%",
     rating: 4.5,
-    brand: "Logitech"
+    brand: "Logitech",
+    description: "Look your best in every video meeting and stream. Ultra 4K HD resolution with HDR technology for clear video in any light."
   },
   {
     id: 19,
@@ -220,7 +240,8 @@ const dummyProducts: Product[] = [
     category: "Hardware",
     discount: "-13%",
     rating: 4.6,
-    brand: "Blue"
+    brand: "Blue",
+    description: "The ultimate professional USB microphone. Tri-capsule array records almost any situation. Multiple pattern selection."
   },
   {
     id: 20,
@@ -231,7 +252,8 @@ const dummyProducts: Product[] = [
     category: "Hardware",
     discount: "-10%",
     rating: 4.7,
-    brand: "Elgato"
+    brand: "Elgato",
+    description: "Record and stream your gaming gameplay in 1080p60 HDR10 quality. Plug and play functionality with ultra-low latency."
   }
 ];
 
@@ -358,67 +380,22 @@ const ProductList = () => {
           </div>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-4 pt-0 min-h-0">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
+        <div className="flex-1 overflow-y-auto p-4 pt-0 min-h-0 custom-scrollbar">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
             {dummyProducts.map((product) => (
-              <div 
-                key={product.id} 
-                className="group relative bg-gray-900 rounded-lg border border-gray-800 hover:border-red-600 transition-all duration-300 ease-out hover:shadow-xl hover:shadow-red-900/20 hover:-translate-y-1 hover:z-50 hover:rounded-b-none flex flex-col"
-              >
-                {/* Image Container */}
-                <div className="aspect-video w-full overflow-hidden bg-gray-800 relative rounded-t-lg">
-                  <img 
-                    src={product.image} 
-                    alt={product.name} 
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  />
-                  <span className="absolute top-1 right-1 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg">
-                    {product.discount}
-                  </span>
-                  <span className="absolute top-1 left-1 bg-black/80 backdrop-blur-sm text-white text-[9px] font-bold px-1.5 py-0.5 rounded border border-gray-700">
-                    {product.category}
-                  </span>
-                </div>
-                
-                {/* Content Container */}
-                <div className="p-2 flex-1 flex flex-col justify-between">
-                  <div>
-                    <h3 className="text-xs font-bold text-white truncate mb-0.5">{product.name}</h3>
-                    <p className="text-[9px] text-gray-500 mb-1">{product.brand}</p>
-                  </div>
-                  
-                  <div>
-                    <div className="flex items-end justify-between mb-1">
-                      <div>
-                        <p className="text-gray-500 text-[9px] line-through">{product.originalPrice}</p>
-                        <p className="text-red-500 text-sm font-bold">{product.price}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Extended Content (Absolute Footer) */}
-                <div className="absolute top-full -left-px -right-px bg-gray-900 border border-t-0 border-red-600 rounded-b-lg p-2 shadow-xl shadow-red-900/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto z-50">
-                  <div className="pt-1 border-t border-gray-800">
-                    <div className="flex items-center mb-1">
-                      {[...Array(5)].map((_, i) => (
-                        <svg 
-                          key={i} 
-                          className={`w-2 h-2 ${i < Math.floor(product.rating) ? 'text-yellow-400' : 'text-gray-600'}`} 
-                          fill="currentColor" 
-                          viewBox="0 0 20 20"
-                        >
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                      ))}
-                      <span className="text-[9px] text-gray-400 ml-1">({product.rating})</span>
-                    </div>
-                    <button className="w-full bg-white hover:bg-gray-200 text-black font-bold py-1 px-2 rounded text-[10px] transition-colors">
-                      Add to Cart
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <ProductCard
+                key={product.id}
+                id={product.id}
+                title={product.name}
+                price={product.price}
+                originalPrice={product.originalPrice}
+                image={product.image}
+                category={product.category}
+                rating={product.rating}
+                className="h-[350px]"
+                enableHoverReveal={true}
+                description={product.description}
+              />
             ))}
           </div>
         </div>
