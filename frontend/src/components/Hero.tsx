@@ -1,29 +1,34 @@
+import { useState, useEffect } from 'react';
 import ArcCarousel, { type DealItem } from './ArcCarousel';
 
-const gameDeals: DealItem[] = [
-  { id: 1, title: "Cyberpunk 2077", price: "$29.99", originalPrice: "$59.99", category: "RPG", image: "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=400&q=80", rating: 4.5 },
-  { id: 2, title: "Elden Ring", price: "$39.99", originalPrice: "$59.99", category: "RPG", image: "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=400&q=80", rating: 5 },
-  { id: 3, title: "God of War", price: "$49.99", category: "Action", image: "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&w=400&q=80", rating: 4.8 },
-  { id: 4, title: "Starfield", price: "$69.99", category: "RPG", image: "https://images.unsplash.com/photo-1614680376593-902f74cf0d41?auto=format&fit=crop&w=400&q=80", rating: 4.0 },
-  { id: 5, title: "Baldur's Gate 3", price: "$59.99", category: "RPG", image: "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", rating: 5 },
-  { id: 11, title: "Baldur's Gate 3", price: "$59.99", category: "RPG", image: "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", rating: 5 },
-  { id: 12, title: "Baldur's Gate 3", price: "$59.99", category: "RPG", image: "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", rating: 5 },
-  { id: 13, title: "Baldur's Gate 3", price: "$59.99", category: "RPG", image: "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", rating: 5 },
-  { id: 14, title: "Baldur's Gate 3", price: "$59.99", category: "RPG", image: "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", rating: 5 },
-  { id: 15, title: "Baldur's Gate 3", price: "$59.99", category: "RPG", image: "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", rating: 5 },
-  { id: 16, title: "Baldur's Gate 3", price: "$59.99", category: "RPG", image: "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", rating: 5 },
-
-];
-
-const hardwareDeals: DealItem[] = [
-  { id: 6, title: "RTX 4090", price: "$1599.99", category: "GPU", image: "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=400&q=80", rating: 4.9 },
-  { id: 7, title: "Ryzen 9 7950X", price: "$599.99", originalPrice: "$699.99", category: "CPU", image: "https://images.unsplash.com/photo-1555616635-640960031520?auto=format&fit=crop&w=400&q=80", rating: 4.7 },
-  { id: 8, title: "Logitech G Pro", price: "$99.99", category: "Mouse", image: "https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?auto=format&fit=crop&w=400&q=80", rating: 4.6 },
-  { id: 9, title: "Corsair K70", price: "$129.99", category: "Keyboard", image: "https://images.unsplash.com/photo-1587829741301-dc798b91a603?auto=format&fit=crop&w=400&q=80", rating: 4.5 },
-  { id: 10, title: "Samsung Odyssey", price: "$999.99", category: "Monitor", image: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=400&q=80", rating: 4.4 },
-];
-
 const Hero = () => {
+  const [gameDeals, setGameDeals] = useState<DealItem[]>([]);
+  const [hardwareDeals, setHardwareDeals] = useState<DealItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDeals = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/deals');
+        if (response.ok) {
+          const data = await response.json();
+          setGameDeals(data.game_deals);
+          setHardwareDeals(data.hardware_deals);
+        }
+      } catch (error) {
+        console.error('Failed to fetch deals:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDeals();
+  }, []);
+
+  if (loading) {
+    return <div className="h-full bg-black flex items-center justify-center text-white">Loading deals...</div>;
+  }
+
   return (
     <div className="relative bg-black overflow-hidden h-full flex items-center">
       {/* Background Image */}
