@@ -25,7 +25,7 @@ const hardwareDeals: DealItem[] = [
 
 const Hero = () => {
   return (
-    <div className="relative bg-black overflow-hidden h-screen flex items-center">
+    <div className="relative bg-black overflow-hidden h-full flex items-center">
       {/* Background Image */}
       <div className="absolute inset-0">
         <img
