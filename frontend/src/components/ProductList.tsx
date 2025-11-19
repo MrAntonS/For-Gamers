@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ProductCard from './ProductCard';
 
 interface Product {
@@ -14,7 +14,7 @@ interface Product {
   description: string;
 }
 
-const dummyProducts: Product[] = [
+/* const dummyProducts: Product[] = [
   {
     id: 1,
     name: "Cyberpunk 2077",
@@ -255,7 +255,7 @@ const dummyProducts: Product[] = [
     brand: "Elgato",
     description: "Record and stream your gaming gameplay in 1080p60 HDR10 quality. Plug and play functionality with ultra-low latency."
   }
-];
+]; */
 
 const FilterSection = ({ title, children }: { title: string, children: React.ReactNode }) => (
   <div className="mb-6">
@@ -279,7 +279,29 @@ const CheckboxFilter = ({ label }: { label: string }) => (
 );
 
 const ProductList = () => {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [priceRange, setPriceRange] = useState(1000);
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/products');
+        if (!response.ok) {
+          throw new Error('Failed to fetch products');
+        }
+        const data = await response.json();
+        setProducts(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
 
   return (
     <div className="bg-black h-full text-white flex overflow-hidden">
@@ -381,23 +403,29 @@ const ProductList = () => {
         </div>
         
         <div className="flex-1 overflow-y-auto p-4 pt-0 min-h-0 custom-scrollbar">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
-            {dummyProducts.map((product) => (
-              <ProductCard
-                key={product.id}
-                id={product.id}
-                title={product.name}
-                price={product.price}
-                originalPrice={product.originalPrice}
-                image={product.image}
-                category={product.category}
-                rating={product.rating}
-                className="h-[350px]"
-                enableHoverReveal={true}
-                description={product.description}
-              />
-            ))}
-          </div>
+          {loading ? (
+            <div className="text-center py-10 text-white">Loading products...</div>
+          ) : error ? (
+            <div className="text-center py-10 text-red-500">Error: {error}</div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+              {products.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  id={product.id}
+                  title={product.name}
+                  price={product.price}
+                  originalPrice={product.originalPrice}
+                  image={product.image}
+                  category={product.category}
+                  rating={product.rating}
+                  className="h-[350px]"
+                  enableHoverReveal={true}
+                  description={product.description}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Pagination */}
