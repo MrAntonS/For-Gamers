@@ -30,11 +30,22 @@ jobs:
         ssh-keyscan -H ${{ secrets.ORACLE_VM_IP }} >> ~/.ssh/known_hosts
 
     - name: Copy files to VM
-      run: scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa docker-compose.yml frontend.tar backend.tar ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }}:~/
+      run: scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa docker-compose.prod.yml frontend.tar backend.tar ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }}:~/
 
     - name: Deploy on VM
       run: |
         ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }} << 'EOF'
+          # Rename prod compose file to standard name for convenience
+          mv docker-compose.prod.yml docker-compose.yml
+
+          # Stop old containers
+          echo "Stopping old containers..."
+          docker compose down
+
+          # Remove old images to ensure we use the new ones
+          echo "Removing old images..."
+          docker rmi gamer-nexus-frontend:latest gamer-nexus-backend:latest || true
+
           # Load images from .tar files
           echo "Loading frontend image..."
           docker load < frontend.tar
@@ -45,9 +56,6 @@ jobs:
           echo "Available images:"
           docker images
           
-          # Stop and remove old containers, then start new ones
-          echo "Stopping old containers..."
-          docker compose down
           echo "Starting new containers..."
           docker compose up -d
           
@@ -55,6 +63,7 @@ jobs:
           echo "Container status:"
           docker compose ps
           
-          # Clean up the .tar files
+          # Clean up the .tar files and dangling images
           rm frontend.tar backend.tar
+          docker image prune -f
         EOF
