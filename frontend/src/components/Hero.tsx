@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import ArcCarousel, { type DealItem } from './ArcCarousel';
+import { API_BASE_URL } from '../config';
 
 const Hero = () => {
   const [gameDeals, setGameDeals] = useState<DealItem[]>([]);
@@ -9,7 +10,7 @@ const Hero = () => {
   useEffect(() => {
     const fetchDeals = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/deals');
+        const response = await fetch(`${API_BASE_URL}/api/deals`);
         if (response.ok) {
           const data = await response.json();
           setGameDeals(data.game_deals);
