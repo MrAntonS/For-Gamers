@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ProductCard from './ProductCard';
 
 export interface DealItem {
   id: number;
@@ -16,24 +17,7 @@ interface ArcCarouselProps {
   fallbackImage?: string;
 }
 
-const CardImage = ({ src, alt, fallbackSrc }: { src: string, alt: string, fallbackSrc: string }) => {
-  const [imgSrc, setImgSrc] = useState(src);
-
-  useEffect(() => {
-    setImgSrc(src);
-  }, [src]);
-
-  return (
-    <img 
-      src={imgSrc} 
-      alt={alt} 
-      className="w-full h-full object-cover"
-      onError={() => setImgSrc(fallbackSrc)}
-    />
-  );
-};
-
-const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage = "https://placehold.co/400x600?text=No+Image" }) => {
+const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage }) => {
   const [activeIndex, setActiveIndex] = useState(Math.floor(items.length / 2));
   const containerRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef(false);
@@ -163,57 +147,24 @@ const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage = 
           const zIndex = 100 - Math.abs(offset);
 
           return (
-            <div
+            <ProductCard
               key={item.id}
-              className="absolute top-1/2 left-1/2 w-40 2xl:w-[11vw] aspect-2/3 h-auto bg-gray-900 border border-gray-700 rounded-xl shadow-2xl overflow-hidden transition-all duration-500 ease-out cursor-pointer hover:border-red-500"
+              id={item.id}
+              title={item.title}
+              price={item.price}
+              originalPrice={item.originalPrice}
+              image={item.image}
+              category={item.category}
+              rating={item.rating}
+              fallbackImage={fallbackImage}
+              className="absolute top-1/2 left-1/2 w-40 2xl:w-[11vw] aspect-2/3 h-auto"
               style={{
                 transform: `translate(-50%, -50%) translateY(${translateY}%) translateX(${translateX}%) rotate(${rotateZ}deg) scale(${scale})`,
                 zIndex,
                 opacity: Math.max(opacity, 0),
               }}
               onClick={() => handleCardClick(index)}
-            >
-              <div className="h-3/5 w-full bg-gray-800 relative">
-                <CardImage 
-                  src={item.image} 
-                  alt={item.title} 
-                  fallbackSrc={fallbackImage}
-                />
-                <div className="absolute top-1 right-1 2xl:top-2 2xl:right-2 bg-red-600 text-white text-[10px] 2xl:text-xs font-bold px-1.5 py-0.5 2xl:px-2 2xl:py-1 rounded">
-                  {item.category}
-                </div>
-              </div>
-              <div className="p-2 2xl:p-4 text-left">
-                <h3 className="text-sm 2xl:text-lg font-bold text-white truncate">{item.title}</h3>
-                
-                <div className="flex items-center justify-between mt-1 2xl:mt-2">
-                  <div className="flex items-baseline space-x-1 2xl:space-x-2">
-                    <span className="text-base 2xl:text-xl font-bold text-red-500">{item.price}</span>
-                    {item.originalPrice && (
-                      <span className="text-[10px] 2xl:text-sm text-gray-500 line-through">{item.originalPrice}</span>
-                    )}
-                  </div>
-
-                  {/* Star Rating */}
-                  <div className="flex items-center">
-                    {[...Array(5)].map((_, i) => (
-                      <svg 
-                        key={i} 
-                        className={`w-3 h-3 2xl:w-4 2xl:h-4 ${i < (item.rating || 0) ? 'text-yellow-400' : 'text-gray-600'}`} 
-                        fill="currentColor" 
-                        viewBox="0 0 20 20"
-                      >
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                      </svg>
-                    ))}
-                  </div>
-                </div>
-
-                <button className="mt-2 2xl:mt-3 w-full bg-white text-black text-xs 2xl:text-sm font-bold py-1 2xl:py-2 rounded hover:bg-gray-200 transition-colors">
-                  Add to Cart
-                </button>
-              </div>
-            </div>
+            />
           );
         })}
       </div>

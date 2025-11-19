@@ -6,7 +6,10 @@ def create_app():
     CORS(app)
 
     with app.app_context():
-        from .routes import products
+        try:
+            from .routes import products
+        except ImportError:
+            from routes import products
         app.register_blueprint(products.products_bp)
 
     return app
