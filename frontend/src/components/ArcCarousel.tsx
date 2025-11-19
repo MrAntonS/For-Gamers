@@ -36,6 +36,7 @@ const CardImage = ({ src, alt, fallbackSrc }: { src: string, alt: string, fallba
 const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage = "https://placehold.co/400x600?text=No+Image" }) => {
   const [activeIndex, setActiveIndex] = useState(Math.floor(items.length / 2));
   const containerRef = useRef<HTMLDivElement>(null);
+  const isScrollingRef = useRef(false);
 
   // Auto-scroll effect
   useEffect(() => {
@@ -46,11 +47,52 @@ const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage = 
   }, [items.length, activeIndex]);
 
   const handleWheel = (e: React.WheelEvent) => {
+    if (isScrollingRef.current) return;
+
+    isScrollingRef.current = true;
+    setTimeout(() => {
+      isScrollingRef.current = false;
+    }, 500);
+
     if (e.deltaY > 0) {
       setActiveIndex((prev) => (prev + 1) % items.length);
     } else {
       setActiveIndex((prev) => (prev - 1 + items.length) % items.length);
     }
+  };
+
+  const handleCardClick = (index: number) => {
+    if (isScrollingRef.current) return;
+
+    let diff = index - activeIndex;
+    // Normalize diff for shortest path
+    if (diff > items.length / 2) diff -= items.length;
+    if (diff < -items.length / 2) diff += items.length;
+
+    if (diff === 0) return;
+
+    const direction = diff > 0 ? 1 : -1;
+    const steps = Math.abs(diff);
+    
+    isScrollingRef.current = true;
+    let stepCount = 0;
+
+    const interval = setInterval(() => {
+      setActiveIndex((prev) => {
+        let next = prev + direction;
+        if (next < 0) next += items.length;
+        if (next >= items.length) next -= items.length;
+        return next;
+      });
+      
+      stepCount++;
+      if (stepCount === steps) {
+        clearInterval(interval);
+        setTimeout(() => {
+          isScrollingRef.current = false;
+        }, 500);
+      }
+    }, 150);
   };
 
   // Prevent default scroll behavior when hovering the carousel
@@ -72,7 +114,7 @@ const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage = 
     <div 
       ref={containerRef}
       onWheel={handleWheel}
-      className={`absolute top-1/2 -translate-y-1/2 h-[800px] w-[500px] flex items-center justify-center z-10 ${side === 'left' ? 'left-4' : 'right-4'}`}
+      className={`absolute top-1/2 -translate-y-1/2 h-[400px] 2xl:h-[40vh] w-[250px] 2xl:w-[17.5vw] hidden lg:flex items-center justify-center z-10 ${side === 'left' ? 'left-4' : 'right-4'}`}
     >
       <div className="relative w-full h-full">
         {items.map((item, index) => {
@@ -82,8 +124,8 @@ const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage = 
           if (offset < -items.length / 2) offset += items.length;
           
           // Configuration for the arc
-          const ySpacing = 320; // Increased spacing for bigger cards
-          const xCurve = 140;    // Increased curve
+          const ySpacing = 66.6; // Percentage of card height
+          const xCurve = 43.75;    // Percentage of card width
           const rotation = 15;  
           const scaleStep = 0.1; 
           const opacityStep = 0.2; // Less opacity fade to see more items
@@ -123,13 +165,13 @@ const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage = 
           return (
             <div
               key={item.id}
-              className="absolute top-1/2 left-1/2 w-80 h-[480px] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl overflow-hidden transition-all duration-500 ease-out cursor-pointer hover:border-red-500"
+              className="absolute top-1/2 left-1/2 w-40 2xl:w-[11vw] aspect-2/3 h-auto bg-gray-900 border border-gray-700 rounded-xl shadow-2xl overflow-hidden transition-all duration-500 ease-out cursor-pointer hover:border-red-500"
               style={{
-                transform: `translate(-50%, -50%) translateY(${translateY}px) translateX(${translateX}px) rotate(${rotateZ}deg) scale(${scale})`,
+                transform: `translate(-50%, -50%) translateY(${translateY}%) translateX(${translateX}%) rotate(${rotateZ}deg) scale(${scale})`,
                 zIndex,
                 opacity: Math.max(opacity, 0),
               }}
-              onClick={() => setActiveIndex(index)}
+              onClick={() => handleCardClick(index)}
             >
               <div className="h-3/5 w-full bg-gray-800 relative">
                 <CardImage 
@@ -137,18 +179,18 @@ const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage = 
                   alt={item.title} 
                   fallbackSrc={fallbackImage}
                 />
-                <div className="absolute top-2 right-2 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded">
+                <div className="absolute top-1 right-1 2xl:top-2 2xl:right-2 bg-red-600 text-white text-[10px] 2xl:text-xs font-bold px-1.5 py-0.5 2xl:px-2 2xl:py-1 rounded">
                   {item.category}
                 </div>
               </div>
-              <div className="p-4 text-left">
-                <h3 className="text-lg font-bold text-white truncate">{item.title}</h3>
+              <div className="p-2 2xl:p-4 text-left">
+                <h3 className="text-sm 2xl:text-lg font-bold text-white truncate">{item.title}</h3>
                 
-                <div className="flex items-center justify-between mt-2">
-                  <div className="flex items-baseline space-x-2">
-                    <span className="text-xl font-bold text-red-500">{item.price}</span>
+                <div className="flex items-center justify-between mt-1 2xl:mt-2">
+                  <div className="flex items-baseline space-x-1 2xl:space-x-2">
+                    <span className="text-base 2xl:text-xl font-bold text-red-500">{item.price}</span>
                     {item.originalPrice && (
-                      <span className="text-sm text-gray-500 line-through">{item.originalPrice}</span>
+                      <span className="text-[10px] 2xl:text-sm text-gray-500 line-through">{item.originalPrice}</span>
                     )}
                   </div>
 
@@ -157,7 +199,7 @@ const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage = 
                     {[...Array(5)].map((_, i) => (
                       <svg 
                         key={i} 
-                        className={`w-4 h-4 ${i < (item.rating || 0) ? 'text-yellow-400' : 'text-gray-600'}`} 
+                        className={`w-3 h-3 2xl:w-4 2xl:h-4 ${i < (item.rating || 0) ? 'text-yellow-400' : 'text-gray-600'}`} 
                         fill="currentColor" 
                         viewBox="0 0 20 20"
                       >
@@ -167,7 +209,7 @@ const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage = 
                   </div>
                 </div>
 
-                <button className="mt-3 w-full bg-white text-black text-sm font-bold py-2 rounded hover:bg-gray-200 transition-colors">
+                <button className="mt-2 2xl:mt-3 w-full bg-white text-black text-xs 2xl:text-sm font-bold py-1 2xl:py-2 rounded hover:bg-gray-200 transition-colors">
                   Add to Cart
                 </button>
               </div>
