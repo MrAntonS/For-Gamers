@@ -252,3 +252,29 @@ def get_products():
         }
     ]
     return jsonify(mock_products)
+
+@products_bp.route('/api/deals')
+def get_deals():
+    game_deals = [
+        {"id": 1, "title": "Cyberpunk 2077", "price": "$29.99", "originalPrice": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=400&q=80", "rating": 4.5},
+        {"id": 2, "title": "Elden Ring", "price": "$39.99", "originalPrice": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=400&q=80", "rating": 5},
+        {"id": 3, "title": "God of War", "price": "$49.99", "category": "Action", "image": "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&w=400&q=80", "rating": 4.8},
+        {"id": 4, "title": "Starfield", "price": "$69.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1614680376593-902f74cf0d41?auto=format&fit=crop&w=400&q=80", "rating": 4.0},
+        {"id": 5, "title": "Baldur's Gate 3", "price": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", "rating": 5},
+        {"id": 11, "title": "Baldur's Gate 3", "price": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", "rating": 5},
+        {"id": 12, "title": "Baldur's Gate 3", "price": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", "rating": 5},
+        {"id": 13, "title": "Baldur's Gate 3", "price": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", "rating": 5},
+        {"id": 14, "title": "Baldur's Gate 3", "price": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", "rating": 5},
+        {"id": 15, "title": "Baldur's Gate 3", "price": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", "rating": 5},
+        {"id": 16, "title": "Baldur's Gate 3", "price": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", "rating": 5},
+    ]
+
+    hardware_deals = [
+        {"id": 6, "title": "RTX 4090", "price": "$1599.99", "category": "GPU", "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=400&q=80", "rating": 4.9},
+        {"id": 7, "title": "Ryzen 9 7950X", "price": "$599.99", "originalPrice": "$699.99", "category": "CPU", "image": "https://images.unsplash.com/photo-1555616635-640960031520?auto=format&fit=crop&w=400&q=80", "rating": 4.7},
+        {"id": 8, "title": "Logitech G Pro", "price": "$99.99", "category": "Mouse", "image": "https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?auto=format&fit=crop&w=400&q=80", "rating": 4.6},
+        {"id": 9, "title": "Corsair K70", "price": "$129.99", "category": "Keyboard", "image": "https://images.unsplash.com/photo-1587829741301-dc798b91a603?auto=format&fit=crop&w=400&q=80", "rating": 4.5},
+        {"id": 10, "title": "Samsung Odyssey", "price": "$999.99", "category": "Monitor", "image": "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=400&q=80", "rating": 4.4},
+    ]
+
+    return jsonify({"game_deals": game_deals, "hardware_deals": hardware_deals})
