@@ -1,8 +1,10 @@
+import { Link } from 'react-router-dom';
+
 const Navbar = () => {
   const navItems = [
     { name: "Min-Max build", href: "#" },
-    { name: "Game Deals", href: "#" },
-    { name: "Hardware Deals", href: "#" },
+    { name: "Game Deals", href: "/deals" },
+    { name: "Hardware Deals", href: "/deals" },
     { name: "Best Accessories", href: "#" },
   ];
 
@@ -12,19 +14,19 @@ const Navbar = () => {
         <div className="flex items-center justify-between h-16">
           {/* Left Section: Logo & Nav */}
           <div className="flex items-center">
-            <div className="shrink-0 font-bold text-xl tracking-wider text-red-600 mr-8">
+            <Link to="/" className="shrink-0 font-bold text-xl tracking-wider text-red-600 mr-8">
               FOR GAMERS
-            </div>
+            </Link>
             <div className="hidden md:block">
               <div className="flex items-baseline space-x-4">
                 {navItems.map((item) => (
-                  <a
+                  <Link
                     key={item.name}
-                    href={item.href}
+                    to={item.href}
                     className="hover:bg-red-600 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200"
                   >
                     {item.name}
-                  </a>
+                  </Link>
                 ))}
               </div>
             </div>
