@@ -10,7 +10,11 @@ GAMES_DATABASE = [
         "category": "RPG",
         "image": "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=400&q=80",
         "recommended_gpu": "RTX 3070",
-        "gpu_score": 70
+        "gpu_score": 70,
+        "recommended_cpu": "Core i7-12700K",
+        "cpu_score": 75,
+        "recommended_memory": "16GB",
+        "memory_score": 16
     },
     {
         "id": 2,
@@ -18,7 +22,11 @@ GAMES_DATABASE = [
         "category": "RPG",
         "image": "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=400&q=80",
         "recommended_gpu": "RTX 3060",
-        "gpu_score": 60
+        "gpu_score": 60,
+        "recommended_cpu": "Core i5-12600K",
+        "cpu_score": 60,
+        "recommended_memory": "16GB",
+        "memory_score": 16
     },
     {
         "id": 3,
@@ -26,7 +34,11 @@ GAMES_DATABASE = [
         "category": "Action",
         "image": "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&w=400&q=80",
         "recommended_gpu": "RTX 3060 Ti",
-        "gpu_score": 65
+        "gpu_score": 65,
+        "recommended_cpu": "Core i5-12600K",
+        "cpu_score": 60,
+        "recommended_memory": "16GB",
+        "memory_score": 16
     },
     {
         "id": 4,
@@ -34,7 +46,11 @@ GAMES_DATABASE = [
         "category": "RPG",
         "image": "https://images.unsplash.com/photo-1614680376593-902f74cf0d41?auto=format&fit=crop&w=400&q=80",
         "recommended_gpu": "RTX 3070 Ti",
-        "gpu_score": 75
+        "gpu_score": 75,
+        "recommended_cpu": "Core i7-13700K",
+        "cpu_score": 85,
+        "recommended_memory": "16GB",
+        "memory_score": 16
     },
     {
         "id": 5,
@@ -42,7 +58,11 @@ GAMES_DATABASE = [
         "category": "RPG",
         "image": "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80",
         "recommended_gpu": "RTX 3060",
-        "gpu_score": 60
+        "gpu_score": 60,
+        "recommended_cpu": "Core i5-12400F",
+        "cpu_score": 50,
+        "recommended_memory": "16GB",
+        "memory_score": 16
     },
     {
         "id": 6,
@@ -50,7 +70,11 @@ GAMES_DATABASE = [
         "category": "RPG",
         "image": "https://images.unsplash.com/photo-1519669556878-63bdad8a1a49?auto=format&fit=crop&w=400&q=80",
         "recommended_gpu": "GTX 1660",
-        "gpu_score": 40
+        "gpu_score": 40,
+        "recommended_cpu": "Core i5-10400F",
+        "cpu_score": 40,
+        "recommended_memory": "8GB",
+        "memory_score": 8
     },
     {
         "id": 7,
@@ -58,7 +82,11 @@ GAMES_DATABASE = [
         "category": "Action",
         "image": "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=400&q=80",
         "recommended_gpu": "RTX 3060 Ti",
-        "gpu_score": 65
+        "gpu_score": 65,
+        "recommended_cpu": "Core i5-11400F",
+        "cpu_score": 50,
+        "recommended_memory": "16GB",
+        "memory_score": 16
     },
     {
         "id": 8,
@@ -66,7 +94,11 @@ GAMES_DATABASE = [
         "category": "RPG",
         "image": "https://images.unsplash.com/photo-1633114128174-2f8aa49759b0?auto=format&fit=crop&w=400&q=80",
         "recommended_gpu": "RTX 3070",
-        "gpu_score": 70
+        "gpu_score": 70,
+        "recommended_cpu": "Core i7-12700K",
+        "cpu_score": 75,
+        "recommended_memory": "32GB",
+        "memory_score": 32
     },
     {
         "id": 9,
@@ -74,7 +106,11 @@ GAMES_DATABASE = [
         "category": "FPS",
         "image": "https://images.unsplash.com/photo-1560419015-7c427e8ae5ba?auto=format&fit=crop&w=400&q=80",
         "recommended_gpu": "RTX 3060 Ti",
-        "gpu_score": 65
+        "gpu_score": 65,
+        "recommended_cpu": "Core i5-12400F",
+        "cpu_score": 50,
+        "recommended_memory": "16GB",
+        "memory_score": 16
     },
     {
         "id": 10,
@@ -82,7 +118,11 @@ GAMES_DATABASE = [
         "category": "Action",
         "image": "https://images.unsplash.com/photo-1635805737707-575885ab0820?auto=format&fit=crop&w=400&q=80",
         "recommended_gpu": "RTX 3060",
-        "gpu_score": 60
+        "gpu_score": 60,
+        "recommended_cpu": "Core i5-11400F",
+        "cpu_score": 50,
+        "recommended_memory": "16GB",
+        "memory_score": 16
     },
     {
         "id": 11,
@@ -90,7 +130,11 @@ GAMES_DATABASE = [
         "category": "Racing",
         "image": "https://images.unsplash.com/photo-1511919884226-fd3cad34687c?auto=format&fit=crop&w=400&q=80",
         "recommended_gpu": "RTX 2060",
-        "gpu_score": 50
+        "gpu_score": 50,
+        "recommended_cpu": "Core i5-10400F",
+        "cpu_score": 40,
+        "recommended_memory": "8GB",
+        "memory_score": 8
     },
     {
         "id": 12,
@@ -98,7 +142,11 @@ GAMES_DATABASE = [
         "category": "Horror",
         "image": "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=400&q=80",
         "recommended_gpu": "RTX 3070",
-        "gpu_score": 70
+        "gpu_score": 70,
+        "recommended_cpu": "Core i5-12600K",
+        "cpu_score": 60,
+        "recommended_memory": "16GB",
+        "memory_score": 16
     }
 ]
 
@@ -122,6 +170,30 @@ GPU_DATABASE = [
     {"name": "RTX 4090", "score": 100, "price": "$1600"}
 ]
 
+# CPU performance database
+CPU_DATABASE = [
+    {"name": "Core i3-10100F", "score": 30, "price": "$80"},
+    {"name": "Core i3-12100F", "score": 40, "price": "$100"},
+    {"name": "Core i5-10400F", "score": 45, "price": "$120"},
+    {"name": "Core i5-11400F", "score": 50, "price": "$140"},
+    {"name": "Core i5-12400F", "score": 55, "price": "$160"},
+    {"name": "Core i5-12600K", "score": 65, "price": "$250"},
+    {"name": "Core i5-13600K", "score": 75, "price": "$300"},
+    {"name": "Core i7-12700K", "score": 80, "price": "$350"},
+    {"name": "Core i7-13700K", "score": 90, "price": "$400"},
+    {"name": "Core i9-13900K", "score": 100, "price": "$600"}
+]
+
+# Memory database
+MEMORY_DATABASE = [
+    {"name": "8GB DDR4", "score": 8, "price": "$40"},
+    {"name": "16GB DDR4", "score": 16, "price": "$70"},
+    {"name": "32GB DDR4", "score": 32, "price": "$120"},
+    {"name": "64GB DDR4", "score": 64, "price": "$200"},
+    {"name": "16GB DDR5", "score": 18, "price": "$100"}, # Slightly higher score for DDR5
+    {"name": "32GB DDR5", "score": 34, "price": "$160"}
+]
+
 @minmax_bp.route('/api/games/list', methods=['GET'])
 def get_games_list():
     """
@@ -141,9 +213,9 @@ def get_games_list():
     return jsonify(games)
 
 @minmax_bp.route('/api/minmax/recommend', methods=['POST'])
-def recommend_gpu():
+def recommend_setup():
     """
-    Recommend the minimum GPU that can handle all selected games at 1440p 60fps.
+    Recommend the minimum setup that can handle all selected games at 1440p 60fps.
     Expects a JSON body with: {"game_ids": [1, 2, 3]}
     """
     data = request.get_json()
@@ -170,20 +242,34 @@ def recommend_gpu():
     if not selected_games:
         return jsonify({"error": "No valid games found"}), 404
     
-    # Find the maximum GPU score required across all selected games
-    max_required_score = max(game["gpu_score"] for game in selected_games)
-    
-    # Find the minimum GPU that meets or exceeds this requirement
-    suitable_gpus = [gpu for gpu in GPU_DATABASE if gpu["score"] >= max_required_score]
-    
+    # --- GPU Recommendation ---
+    max_gpu_score = max(game["gpu_score"] for game in selected_games)
+    suitable_gpus = [gpu for gpu in GPU_DATABASE if gpu["score"] >= max_gpu_score]
     if not suitable_gpus:
         return jsonify({"error": "No GPU found for the requirements"}), 404
-    
-    # Sort by score to get the minimum capable GPU
     suitable_gpus.sort(key=lambda x: x["score"])
     recommended_gpu = suitable_gpus[0]
+
+    # --- CPU Recommendation ---
+    max_cpu_score = max(game["cpu_score"] for game in selected_games)
+    suitable_cpus = [cpu for cpu in CPU_DATABASE if cpu["score"] >= max_cpu_score]
+    if not suitable_cpus:
+        # Fallback to highest if none match (unlikely with current data)
+        suitable_cpus = sorted(CPU_DATABASE, key=lambda x: x["score"], reverse=True)
+    else:
+        suitable_cpus.sort(key=lambda x: x["score"])
+    recommended_cpu = suitable_cpus[0]
+
+    # --- Memory Recommendation ---
+    max_memory_score = max(game["memory_score"] for game in selected_games)
+    suitable_memory = [mem for mem in MEMORY_DATABASE if mem["score"] >= max_memory_score]
+    if not suitable_memory:
+        suitable_memory = sorted(MEMORY_DATABASE, key=lambda x: x["score"], reverse=True)
+    else:
+        suitable_memory.sort(key=lambda x: x["score"])
+    recommended_memory = suitable_memory[0]
     
-    # Get the most demanding game
+    # Get the most demanding game (based on GPU score primarily)
     most_demanding_game = max(selected_games, key=lambda x: x["gpu_score"])
     
     # Prepare response
@@ -193,17 +279,34 @@ def recommend_gpu():
             "score": recommended_gpu["score"],
             "price": recommended_gpu["price"]
         },
+        "recommended_cpu": {
+            "name": recommended_cpu["name"],
+            "score": recommended_cpu["score"],
+            "price": recommended_cpu["price"]
+        },
+        "recommended_memory": {
+            "name": recommended_memory["name"],
+            "score": recommended_memory["score"],
+            "price": recommended_memory["price"]
+        },
         "selected_games_count": len(selected_games),
         "most_demanding_game": {
             "name": most_demanding_game["name"],
-            "required_gpu": most_demanding_game["recommended_gpu"]
+            "required_gpu": most_demanding_game["recommended_gpu"],
+            "required_cpu": most_demanding_game["recommended_cpu"],
+            "required_memory": most_demanding_game["recommended_memory"]
         },
         "selected_games": [
             {
                 "id": game["id"],
                 "name": game["name"],
                 "required_gpu": game["recommended_gpu"],
-                "gpu_score": game["gpu_score"]
+                "gpu_score": game["gpu_score"],
+                "required_cpu": game["recommended_cpu"],
+                "cpu_score": game["cpu_score"],
+                "required_memory": game["recommended_memory"],
+                "memory_score": game["memory_score"],
+                "image": game["image"]
             }
             for game in selected_games
         ]
