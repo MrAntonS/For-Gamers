@@ -8,10 +8,11 @@ def create_app():
 
     with app.app_context():
         try:
-            from .routes import products
+            from .routes import products, minmax
         except ImportError:
-            from routes import products
+            from routes import products, minmax
         app.register_blueprint(products.products_bp)
+        app.register_blueprint(minmax.minmax_bp)
 
     return app
 
