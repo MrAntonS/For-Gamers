@@ -3,8 +3,8 @@ from flask_cors import CORS
 
 def create_app():
     app = Flask(__name__)
-    # Enable CORS for all domains on all routes, allowing all methods and headers
-    CORS(app, resources={r"/*": {"origins": "*", "methods": "*", "allow_headers": "*"}})
+    # Enable CORS for all domains on all routes
+    CORS(app)
 
     with app.app_context():
         try:
