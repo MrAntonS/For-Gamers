@@ -122,7 +122,7 @@ GPU_DATABASE = [
     {"name": "RTX 4090", "score": 100, "price": "$1600"}
 ]
 
-@minmax_bp.route('/api/games/list')
+@minmax_bp.route('/api/games/list', methods=['GET'])
 def get_games_list():
     """
     Get list of all available games for selection.
@@ -153,8 +153,16 @@ def recommend_gpu():
     
     game_ids = data['game_ids']
     
+    # Validate that game_ids is a list
+    if not isinstance(game_ids, list):
+        return jsonify({"error": "game_ids must be a list"}), 400
+    
     if not game_ids:
         return jsonify({"error": "Please select at least one game"}), 400
+    
+    # Validate that all game_ids are integers
+    if not all(isinstance(gid, int) for gid in game_ids):
+        return jsonify({"error": "All game_ids must be integers"}), 400
     
     # Find the selected games
     selected_games = [game for game in GAMES_DATABASE if game["id"] in game_ids]

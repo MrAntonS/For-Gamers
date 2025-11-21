@@ -43,13 +43,17 @@ const MinMaxTab = () => {
       try {
         const response = await fetch(`${API_BASE_URL}/api/games/list`);
         if (!response.ok) {
-          throw new Error('Failed to fetch games');
+          throw new Error(`Server error: ${response.status}`);
         }
         const data = await response.json();
         setGames(data);
       } catch (err) {
         console.error('Error fetching games:', err);
-        setError('Failed to load games. Please try again later.');
+        if (err instanceof TypeError && err.message.includes('fetch')) {
+          setError('Unable to connect to the server. Please check your internet connection and try again.');
+        } else {
+          setError('Failed to load games. Please refresh the page or try again later.');
+        }
       }
     };
 
@@ -89,14 +93,22 @@ const MinMaxTab = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to get recommendation');
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || `Server error (${response.status})`;
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
       setRecommendation(data);
     } catch (err) {
       console.error('Error getting recommendation:', err);
-      setError('Failed to get GPU recommendation. Please try again.');
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        setError('Unable to connect to the server. Please check your internet connection.');
+      } else if (err instanceof Error) {
+        setError(`Failed to get GPU recommendation: ${err.message}`);
+      } else {
+        setError('Failed to get GPU recommendation. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
