@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import Hero from './components/Hero'
 import ProductList from './components/ProductList'
+import MinMaxTab from './components/MinMaxTab'
 import './App.css'
 
 function App() {
@@ -13,6 +14,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Hero />} />
             <Route path="/deals" element={<ProductList />} />
+            <Route path="/minmax" element={<MinMaxTab />} />
           </Routes>
         </div>
       </div>
