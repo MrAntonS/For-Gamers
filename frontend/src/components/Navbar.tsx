@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 const Navbar = () => {
   const navItems = [
     { name: "Min-Max build", href: "/minmax" },
-    { name: "Game Deals", href: "/deals" },
-    { name: "Hardware Deals", href: "/deals" },
+    { name: "Game Deals", href: "/deals/games" },
+    { name: "Hardware Deals", href: "/deals/hardware" },
     { name: "Best Accessories", href: "#" },
   ];
 
