@@ -1,4 +1,5 @@
 import React from 'react';
+import { useCart } from '../contexts/CartContext';
 
 export interface ProductCardProps {
   id: number;
@@ -15,9 +16,11 @@ export interface ProductCardProps {
   fallbackImage?: string;
   enableHoverReveal?: boolean;
   description?: string;
+  brand?: string;
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ 
+  id,
   title, 
   price, 
   originalPrice, 
@@ -30,8 +33,24 @@ const ProductCard: React.FC<ProductCardProps> = ({
   showAddToCart = true,
   fallbackImage = "https://placehold.co/400x600?text=No+Image",
   enableHoverReveal = false,
-  description
+  description,
+  brand
 }) => {
+  const { addToCart } = useCart();
+
+  const handleAddToCart = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    addToCart({
+      id,
+      name: title,
+      price,
+      originalPrice,
+      image,
+      category,
+      brand
+    });
+  };
+
   return (
     <div
       className={`bg-gray-900 border border-gray-700 rounded-xl shadow-2xl transition-all duration-500 ease-out cursor-pointer hover:border-red-500 ${enableHoverReveal ? 'group relative hover:z-50 hover:rounded-b-none' : 'overflow-hidden'} ${className}`}
@@ -78,7 +97,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
         </div>
 
         {showAddToCart && !enableHoverReveal && (
-          <button className="mt-2 2xl:mt-3 w-full bg-white text-black text-xs 2xl:text-sm font-bold py-1 2xl:py-2 rounded hover:bg-gray-200 transition-colors">
+          <button 
+            onClick={handleAddToCart}
+            className="mt-2 2xl:mt-3 w-full bg-white text-black text-xs 2xl:text-sm font-bold py-1 2xl:py-2 rounded hover:bg-gray-200 transition-colors"
+          >
             Add to Cart
           </button>
         )}
@@ -89,7 +111,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
           {description && (
             <p className="text-gray-400 text-[10px] 2xl:text-xs mb-2 line-clamp-2">{description}</p>
           )}
-          <button className="w-full bg-white text-black text-xs 2xl:text-sm font-bold py-1 2xl:py-2 rounded hover:bg-gray-200 transition-colors">
+          <button 
+            onClick={handleAddToCart}
+            className="w-full bg-white text-black text-xs 2xl:text-sm font-bold py-1 2xl:py-2 rounded hover:bg-gray-200 transition-colors"
+          >
             Add to Cart
           </button>
         </div>
