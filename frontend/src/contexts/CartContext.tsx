@@ -29,7 +29,28 @@ const CART_STORAGE_KEY = 'gamer-nexus-cart';
 
 // Helper function to parse price string to number
 const parsePrice = (priceStr: string): number => {
-  return parseFloat(priceStr.replace('$', '').replace(/,/g, ''));
+  if (!priceStr || typeof priceStr !== 'string') {
+    return 0;
+  }
+  // Remove currency symbols and commas, then parse
+  const cleaned = priceStr.replace(/[$€£,]/g, '').trim();
+  const parsed = parseFloat(cleaned);
+  return isNaN(parsed) ? 0 : parsed;
+};
+
+// Validate cart item structure
+const isValidCartItem = (item: unknown): item is CartItem => {
+  if (!item || typeof item !== 'object') return false;
+  const obj = item as Record<string, unknown>;
+  return (
+    typeof obj.id === 'number' &&
+    typeof obj.name === 'string' &&
+    typeof obj.price === 'string' &&
+    typeof obj.image === 'string' &&
+    typeof obj.category === 'string' &&
+    typeof obj.quantity === 'number' &&
+    obj.quantity > 0
+  );
 };
 
 export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -39,9 +60,10 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (savedCart) {
       try {
         const parsed = JSON.parse(savedCart);
-        // Validate that parsed data is an array
+        // Validate that parsed data is an array of valid cart items
         if (Array.isArray(parsed)) {
-          return parsed;
+          const validItems = parsed.filter(isValidCartItem);
+          return validItems;
         }
         return [];
       } catch (error) {
