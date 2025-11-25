@@ -18,6 +18,7 @@ export interface ProductCardProps {
   description?: string; // Keeping for compatibility but might not be used in this design
   enableHoverReveal?: boolean; // Keeping for compatibility
   fallbackImage?: string;
+  brand?: string;
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ 
