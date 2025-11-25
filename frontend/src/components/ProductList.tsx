@@ -284,16 +284,20 @@ const ProductList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [priceRange, setPriceRange] = useState(1000);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     const fetchProducts = async () => {
+      setLoading(true);
       try {
-        const response = await fetch(`${API_BASE_URL}/api/products`);
+        const response = await fetch(`${API_BASE_URL}/api/products?page=${currentPage}&limit=48`);
         if (!response.ok) {
           throw new Error('Failed to fetch products');
         }
         const data = await response.json();
-        setProducts(data);
+        setProducts(data.products);
+        setTotalPages(data.total_pages);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
@@ -302,7 +306,7 @@ const ProductList = () => {
     };
 
     fetchProducts();
-  }, []);
+  }, [currentPage]);
 
   return (
     <div className="bg-black h-full text-white flex overflow-hidden">
@@ -432,15 +436,32 @@ const ProductList = () => {
         {/* Pagination */}
         <div className="p-4 border-t border-gray-800 bg-black z-10">
           <div className="flex justify-center space-x-2">
-            <button className="px-3 py-1 rounded border border-gray-700 text-gray-400 hover:text-white hover:border-white disabled:opacity-50 disabled:cursor-not-allowed">
+            <button 
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 rounded border border-gray-700 text-gray-400 hover:text-white hover:border-white disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               &lt;
             </button>
-            <button className="px-3 py-1 rounded bg-red-600 text-white font-bold">1</button>
-            <button className="px-3 py-1 rounded border border-gray-700 text-gray-400 hover:text-white hover:border-white">2</button>
-            <button className="px-3 py-1 rounded border border-gray-700 text-gray-400 hover:text-white hover:border-white">3</button>
-            <span className="px-2 py-1 text-gray-500">...</span>
-            <button className="px-3 py-1 rounded border border-gray-700 text-gray-400 hover:text-white hover:border-white">12</button>
-            <button className="px-3 py-1 rounded border border-gray-700 text-gray-400 hover:text-white hover:border-white">
+            
+            {[...Array(totalPages)].map((_, i) => {
+                const page = i + 1;
+                return (
+                    <button 
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-3 py-1 rounded border ${currentPage === page ? 'bg-red-600 border-red-600 text-white font-bold' : 'border-gray-700 text-gray-400 hover:text-white hover:border-white'}`}
+                    >
+                        {page}
+                    </button>
+                );
+            })}
+
+            <button 
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 rounded border border-gray-700 text-gray-400 hover:text-white hover:border-white disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               &gt;
             </button>
           </div>

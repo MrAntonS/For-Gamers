@@ -38,16 +38,20 @@ const GameDeals = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [priceRange, setPriceRange] = useState(100);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     const fetchGames = async () => {
+      setLoading(true);
       try {
-        const response = await fetch(`${API_BASE_URL}/api/deals`);
+        const response = await fetch(`${API_BASE_URL}/api/deals?page=${currentPage}&limit=18`);
         if (!response.ok) {
           throw new Error('Failed to fetch game deals');
         }
         const data = await response.json();
         setGames(data.game_deals || []);
+        setTotalPages(data.total_pages || 1);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
@@ -56,7 +60,7 @@ const GameDeals = () => {
     };
 
     fetchGames();
-  }, []);
+  }, [currentPage]);
 
   return (
     <div className="bg-black h-full text-white flex overflow-hidden">
@@ -195,16 +199,45 @@ const GameDeals = () => {
 
         {/* Pagination */}
         <div className="p-4 border-t border-gray-800 bg-black z-10">
-          <div className="flex justify-center space-x-2">
-            <button className="px-3 py-1 rounded border border-gray-700 text-gray-400 hover:text-white hover:border-white disabled:opacity-50 disabled:cursor-not-allowed">
+          <div className="flex justify-center space-x-2 flex-wrap gap-y-2">
+            <button 
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 rounded border border-gray-700 text-gray-400 hover:text-white hover:border-white disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               &lt;
             </button>
-            <button className="px-3 py-1 rounded bg-red-600 text-white font-bold">1</button>
-            <button className="px-3 py-1 rounded border border-gray-700 text-gray-400 hover:text-white hover:border-white">2</button>
-            <button className="px-3 py-1 rounded border border-gray-700 text-gray-400 hover:text-white hover:border-white">3</button>
-            <span className="px-2 py-1 text-gray-500">...</span>
-            <button className="px-3 py-1 rounded border border-gray-700 text-gray-400 hover:text-white hover:border-white">12</button>
-            <button className="px-3 py-1 rounded border border-gray-700 text-gray-400 hover:text-white hover:border-white">
+            
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
+              // Simple logic to show first, last, current, and neighbors
+              if (
+                page === 1 || 
+                page === totalPages || 
+                (page >= currentPage - 1 && page <= currentPage + 1)
+              ) {
+                return (
+                  <button 
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`px-3 py-1 rounded border ${currentPage === page ? 'bg-red-600 border-red-600 text-white font-bold' : 'border-gray-700 text-gray-400 hover:text-white hover:border-white'}`}
+                  >
+                    {page}
+                  </button>
+                );
+              } else if (
+                (page === currentPage - 2 && currentPage > 3) || 
+                (page === currentPage + 2 && currentPage < totalPages - 2)
+              ) {
+                 return <span key={page} className="px-2 py-1 text-gray-500">...</span>;
+              }
+              return null;
+            })}
+
+            <button 
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 rounded border border-gray-700 text-gray-400 hover:text-white hover:border-white disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               &gt;
             </button>
           </div>

@@ -1,4 +1,5 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
+import math
 
 products_bp = Blueprint('products_bp', __name__)
 
@@ -251,23 +252,46 @@ def get_products():
             "description": "Stream and record in 1080p60 HDR10 or 4K30. Ultra-low latency technology. Plug and play functionality."
         }
     ]
-    return jsonify(mock_products)
+    
+    # Pagination logic
+    page = request.args.get('page', 1, type=int)
+    limit = request.args.get('limit', 48, type=int)
+    
+    total_products = len(mock_products)
+    total_pages = math.ceil(total_products / limit)
+    
+    start_index = (page - 1) * limit
+    end_index = start_index + limit
+    
+    paginated_products = mock_products[start_index:end_index]
+    
+    return jsonify({
+        "products": paginated_products,
+        "total_products": total_products,
+        "total_pages": total_pages,
+        "current_page": page
+    })
 
 @products_bp.route('/api/deals')
 def get_deals():
-    game_deals = [
+    page = request.args.get('page', 1, type=int)
+    limit = request.args.get('limit', 18, type=int)
+
+    base_game_deals = [
         {"id": 1, "title": "Cyberpunk 2077", "price": "$29.99", "originalPrice": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=400&q=80", "rating": 4.5},
         {"id": 2, "title": "Elden Ring", "price": "$39.99", "originalPrice": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=400&q=80", "rating": 5},
         {"id": 3, "title": "God of War", "price": "$49.99", "category": "Action", "image": "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&w=400&q=80", "rating": 4.8},
         {"id": 4, "title": "Starfield", "price": "$69.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1614680376593-902f74cf0d41?auto=format&fit=crop&w=400&q=80", "rating": 4.0},
         {"id": 5, "title": "Baldur's Gate 3", "price": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", "rating": 5},
-        {"id": 11, "title": "Baldur's Gate 3", "price": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", "rating": 5},
-        {"id": 12, "title": "Baldur's Gate 3", "price": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", "rating": 5},
-        {"id": 13, "title": "Baldur's Gate 3", "price": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", "rating": 5},
-        {"id": 14, "title": "Baldur's Gate 3", "price": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", "rating": 5},
-        {"id": 15, "title": "Baldur's Gate 3", "price": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", "rating": 5},
-        {"id": 16, "title": "Baldur's Gate 3", "price": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", "rating": 5},
     ]
+    
+    # Generate more deals for pagination testing
+    game_deals = []
+    for i in range(100):
+        for deal in base_game_deals:
+            new_deal = deal.copy()
+            new_deal['id'] = len(game_deals) + 1
+            game_deals.append(new_deal)
 
     hardware_deals = [
         {"id": 6, "title": "RTX 4090", "price": "$1599.99", "category": "GPU", "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=400&q=80", "rating": 4.9},
@@ -277,4 +301,18 @@ def get_deals():
         {"id": 10, "title": "Samsung Odyssey", "price": "$999.99", "category": "Monitor", "image": "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=400&q=80", "rating": 4.4},
     ]
 
-    return jsonify({"game_deals": game_deals, "hardware_deals": hardware_deals})
+    total_products = len(game_deals)
+    total_pages = math.ceil(total_products / limit)
+    
+    start_index = (page - 1) * limit
+    end_index = start_index + limit
+    
+    paginated_game_deals = game_deals[start_index:end_index]
+
+    return jsonify({
+        "game_deals": paginated_game_deals, 
+        "hardware_deals": hardware_deals,
+        "total_pages": total_pages,
+        "current_page": page,
+        "total_products": total_products
+    })
