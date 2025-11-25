@@ -2,6 +2,59 @@
 
 This document outlines the available backend API endpoints provided by the Flask application.
 
+## Authentication API
+
+### 1. Sign Up
+- **Endpoint:** `POST /api/auth/signup`
+- **Blueprint:** `auth_bp`
+- **Description:** Creates a new user account and establishes a session.
+- **Request Body:**
+    ```json
+    {
+        "username": "string (3-30 chars)",
+        "email": "string",
+        "password": "string (min 8 chars)"
+    }
+    ```
+- **Response:** JSON object containing:
+    - `message`: Success message
+    - `user`: Object with `id`, `username`, and `email`
+- **Error Responses:**
+    - `400 Bad Request`: Missing or invalid fields
+    - `409 Conflict`: Email or username already exists
+
+### 2. Login
+- **Endpoint:** `POST /api/auth/login`
+- **Blueprint:** `auth_bp`
+- **Description:** Authenticates an existing user and establishes a session.
+- **Request Body:**
+    ```json
+    {
+        "email": "string",
+        "password": "string"
+    }
+    ```
+- **Response:** JSON object containing:
+    - `message`: Success message
+    - `user`: Object with `id`, `username`, and `email`
+- **Error Responses:**
+    - `400 Bad Request`: Missing fields
+    - `401 Unauthorized`: Invalid credentials
+
+### 3. Logout
+- **Endpoint:** `POST /api/auth/logout`
+- **Blueprint:** `auth_bp`
+- **Description:** Clears the current user session.
+- **Response:** JSON object with success message.
+
+### 4. Get Session
+- **Endpoint:** `GET /api/auth/session`
+- **Blueprint:** `auth_bp`
+- **Description:** Returns the current session status.
+- **Response:** JSON object containing:
+    - `authenticated`: Boolean indicating if user is logged in
+    - `user`: User object if authenticated, null otherwise
+
 ## Products API
 
 ### 1. Get All Products
