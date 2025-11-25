@@ -56,8 +56,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       } else {
         setError(result.error || 'An error occurred');
       }
-    } catch {
-      setError('An unexpected error occurred');
+    } catch (err) {
+      // Log error for debugging but show user-friendly message
+      if (import.meta.env.DEV) {
+        console.error('Auth error:', err);
+      }
+      setError('Unable to connect. Please check your connection and try again.');
     } finally {
       setIsSubmitting(false);
     }

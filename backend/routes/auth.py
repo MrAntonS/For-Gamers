@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request, session
 import secrets
-import hashlib
+import re
+import bcrypt
 
 auth_bp = Blueprint('auth_bp', __name__)
 
@@ -8,22 +9,33 @@ auth_bp = Blueprint('auth_bp', __name__)
 # In production, this would be a database
 users_db = {}
 
+# Email validation regex pattern (RFC 5322 simplified)
+EMAIL_PATTERN = re.compile(
+    r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+)
+
 
 def hash_password(password: str) -> str:
-    """Hash a password using SHA-256 with salt."""
-    salt = secrets.token_hex(16)
-    hashed = hashlib.sha256((password + salt).encode()).hexdigest()
-    return f"{salt}${hashed}"
+    """Hash a password using bcrypt."""
+    password_bytes = password.encode('utf-8')
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password_bytes, salt)
+    return hashed.decode('utf-8')
 
 
 def verify_password(password: str, stored_hash: str) -> bool:
-    """Verify a password against its hash."""
+    """Verify a password against its bcrypt hash."""
     try:
-        salt, hashed = stored_hash.split('$')
-        check_hash = hashlib.sha256((password + salt).encode()).hexdigest()
-        return check_hash == hashed
-    except ValueError:
+        password_bytes = password.encode('utf-8')
+        hash_bytes = stored_hash.encode('utf-8')
+        return bcrypt.checkpw(password_bytes, hash_bytes)
+    except (ValueError, TypeError):
         return False
+
+
+def is_valid_email(email: str) -> bool:
+    """Validate email format using regex pattern."""
+    return bool(EMAIL_PATTERN.match(email))
 
 
 @auth_bp.route('/api/auth/signup', methods=['POST'])
@@ -49,8 +61,8 @@ def signup():
     if len(username) < 3 or len(username) > 30:
         return jsonify({"error": "Username must be between 3 and 30 characters"}), 400
     
-    # Basic email validation
-    if '@' not in email or '.' not in email:
+    # Validate email format
+    if not is_valid_email(email):
         return jsonify({"error": "Invalid email format"}), 400
     
     # Validate password strength

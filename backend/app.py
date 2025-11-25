@@ -1,4 +1,5 @@
 import os
+import secrets
 from flask import Flask
 from flask_cors import CORS
 
@@ -6,7 +7,15 @@ def create_app():
     app = Flask(__name__)
     
     # Configure secret key for sessions
-    app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+    # In production, SECRET_KEY must be set in environment
+    # In development, generate a random key (sessions won't persist across restarts)
+    secret_key = os.environ.get('SECRET_KEY')
+    if not secret_key:
+        if os.environ.get('FLASK_ENV') == 'production':
+            raise ValueError("SECRET_KEY environment variable must be set in production")
+        # Generate a random key for development
+        secret_key = secrets.token_hex(32)
+    app.secret_key = secret_key
     
     # Configure session
     app.config['SESSION_COOKIE_HTTPONLY'] = True
