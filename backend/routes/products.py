@@ -21,7 +21,7 @@ def get_products():
             "discount": "-50%",
             "rating": 4.5,
             "brand": "CD Projekt Red",
-            "description": "An open-world, action-adventure story set in Night City, a megalopolis obsessed with power, glamour and body modification."
+            "description": "Cyberpunk 2077 is an open-world, action-adventure story set in Night City, a megalopolis obsessed with power, glamour and body modification. You play as V, a mercenary outlaw going after a one-of-a-kind implant that is the key to immortality. You can customize your character’s cyberware, skillset and playstyle, and explore a vast city where the choices you make shape the story and the world around you."
         },
         {
             "id": 2,
@@ -33,7 +33,7 @@ def get_products():
             "discount": "-11%",
             "rating": 4.8,
             "brand": "NVIDIA",
-            "description": "The GeForce RTX 4070 Ti delivers the ultra performance and features that enthusiast gamers and creators demand."
+            "description": "The GeForce RTX 4070 Ti delivers the ultra performance and features that enthusiast gamers and creators demand. Bring your games and creative projects to life with ray tracing and AI-powered graphics. It’s built with the ultra-efficient NVIDIA Ada Lovelace architecture and up to 12GB of superfast G6X memory."
         },
         {
             "id": 3,
@@ -45,7 +45,7 @@ def get_products():
             "discount": "-33%",
             "rating": 5.0,
             "brand": "FromSoftware",
-            "description": "A fantasy action-RPG adventure set within a world created by Hidetaka Miyazaki and George R.R. Martin."
+            "description": "THE NEW FANTASY ACTION RPG. Rise, Tarnished, and be guided by grace to brandish the power of the Elden Ring and become an Elden Lord in the Lands Between. A vast world where open fields with a variety of situations and huge dungeons with complex and three-dimensional designs are seamlessly connected. As you explore, the joy of discovering unknown and overwhelming threats await you, leading to a high sense of accomplishment."
         },
         {
             "id": 4,
@@ -253,6 +253,11 @@ def get_products():
         }
     ]
     
+    # Filter by category
+    category = request.args.get('category')
+    if category:
+        mock_products = [p for p in mock_products if p['category'].lower() == category.lower()]
+
     # Pagination logic
     page = request.args.get('page', 1, type=int)
     limit = request.args.get('limit', 48, type=int)
@@ -272,47 +277,4 @@ def get_products():
         "current_page": page
     })
 
-@products_bp.route('/api/deals')
-def get_deals():
-    page = request.args.get('page', 1, type=int)
-    limit = request.args.get('limit', 18, type=int)
 
-    base_game_deals = [
-        {"id": 1, "title": "Cyberpunk 2077", "price": "$29.99", "originalPrice": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=400&q=80", "rating": 4.5},
-        {"id": 2, "title": "Elden Ring", "price": "$39.99", "originalPrice": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=400&q=80", "rating": 5},
-        {"id": 3, "title": "God of War", "price": "$49.99", "category": "Action", "image": "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&w=400&q=80", "rating": 4.8},
-        {"id": 4, "title": "Starfield", "price": "$69.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1614680376593-902f74cf0d41?auto=format&fit=crop&w=400&q=80", "rating": 4.0},
-        {"id": 5, "title": "Baldur's Gate 3", "price": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", "rating": 5},
-    ]
-    
-    # Generate more deals for pagination testing
-    game_deals = []
-    for i in range(100):
-        for deal in base_game_deals:
-            new_deal = deal.copy()
-            new_deal['id'] = len(game_deals) + 1
-            game_deals.append(new_deal)
-
-    hardware_deals = [
-        {"id": 6, "title": "RTX 4090", "price": "$1599.99", "category": "GPU", "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=400&q=80", "rating": 4.9},
-        {"id": 7, "title": "Ryzen 9 7950X", "price": "$599.99", "originalPrice": "$699.99", "category": "CPU", "image": "https://images.unsplash.com/photo-1555616635-640960031520?auto=format&fit=crop&w=400&q=80", "rating": 4.7},
-        {"id": 8, "title": "Logitech G Pro", "price": "$99.99", "category": "Mouse", "image": "https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?auto=format&fit=crop&w=400&q=80", "rating": 4.6},
-        {"id": 9, "title": "Corsair K70", "price": "$129.99", "category": "Keyboard", "image": "https://images.unsplash.com/photo-1587829741301-dc798b91a603?auto=format&fit=crop&w=400&q=80", "rating": 4.5},
-        {"id": 10, "title": "Samsung Odyssey", "price": "$999.99", "category": "Monitor", "image": "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=400&q=80", "rating": 4.4},
-    ]
-
-    total_products = len(game_deals)
-    total_pages = math.ceil(total_products / limit)
-    
-    start_index = (page - 1) * limit
-    end_index = start_index + limit
-    
-    paginated_game_deals = game_deals[start_index:end_index]
-
-    return jsonify({
-        "game_deals": paginated_game_deals, 
-        "hardware_deals": hardware_deals,
-        "total_pages": total_pages,
-        "current_page": page,
-        "total_products": total_products
-    })

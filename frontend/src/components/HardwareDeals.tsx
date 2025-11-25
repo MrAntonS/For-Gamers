@@ -10,6 +10,7 @@ interface HardwareDeal {
   category: string;
   image: string;
   rating: number;
+  description?: string;
 }
 
 const FilterSection = ({ title, children }: { title: string, children: React.ReactNode }) => (
@@ -42,12 +43,22 @@ const HardwareDeals = () => {
   useEffect(() => {
     const fetchHardware = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/deals`);
+        const response = await fetch(`${API_BASE_URL}/api/products?category=Hardware`);
         if (!response.ok) {
           throw new Error('Failed to fetch hardware deals');
         }
         const data = await response.json();
-        setHardware(data.hardware_deals || []);
+        const mappedHardware = data.products.map((p: any) => ({
+          id: p.id,
+          title: p.name,
+          price: p.price,
+          originalPrice: p.originalPrice,
+          category: p.category,
+          image: p.image,
+          rating: p.rating,
+          description: p.description
+        }));
+        setHardware(mappedHardware);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
@@ -196,8 +207,8 @@ const HardwareDeals = () => {
                   image={item.image}
                   category={item.category}
                   rating={item.rating}
+                  description={item.description}
                   className="h-[350px]"
-                  enableHoverReveal={false}
                 />
               ))}
             </div>
