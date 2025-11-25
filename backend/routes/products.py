@@ -1,4 +1,5 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
+import math
 
 products_bp = Blueprint('products_bp', __name__)
 
@@ -20,7 +21,7 @@ def get_products():
             "discount": "-50%",
             "rating": 4.5,
             "brand": "CD Projekt Red",
-            "description": "An open-world, action-adventure story set in Night City, a megalopolis obsessed with power, glamour and body modification."
+            "description": "Cyberpunk 2077 is an open-world, action-adventure story set in Night City, a megalopolis obsessed with power, glamour and body modification. You play as V, a mercenary outlaw going after a one-of-a-kind implant that is the key to immortality. You can customize your character’s cyberware, skillset and playstyle, and explore a vast city where the choices you make shape the story and the world around you."
         },
         {
             "id": 2,
@@ -32,7 +33,7 @@ def get_products():
             "discount": "-11%",
             "rating": 4.8,
             "brand": "NVIDIA",
-            "description": "The GeForce RTX 4070 Ti delivers the ultra performance and features that enthusiast gamers and creators demand."
+            "description": "The GeForce RTX 4070 Ti delivers the ultra performance and features that enthusiast gamers and creators demand. Bring your games and creative projects to life with ray tracing and AI-powered graphics. It’s built with the ultra-efficient NVIDIA Ada Lovelace architecture and up to 12GB of superfast G6X memory."
         },
         {
             "id": 3,
@@ -44,7 +45,7 @@ def get_products():
             "discount": "-33%",
             "rating": 5.0,
             "brand": "FromSoftware",
-            "description": "A fantasy action-RPG adventure set within a world created by Hidetaka Miyazaki and George R.R. Martin."
+            "description": "THE NEW FANTASY ACTION RPG. Rise, Tarnished, and be guided by grace to brandish the power of the Elden Ring and become an Elden Lord in the Lands Between. A vast world where open fields with a variety of situations and huge dungeons with complex and three-dimensional designs are seamlessly connected. As you explore, the joy of discovering unknown and overwhelming threats await you, leading to a high sense of accomplishment."
         },
         {
             "id": 4,
@@ -249,32 +250,511 @@ def get_products():
             "rating": 4.5,
             "brand": "Elgato",
             "description": "Stream and record in 1080p60 HDR10 or 4K30. Ultra-low latency technology. Plug and play functionality."
+        },
+        {
+            "id": 21,
+            "name": "Hardware Item 21",
+            "price": "$100.99",
+            "originalPrice": "$150.99",
+            "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-10%",
+            "rating": 4.5,
+            "brand": "Generic Brand",
+            "description": "Description for Hardware Item 21"
+        },
+        {
+            "id": 22,
+            "name": "Hardware Item 22",
+            "price": "$110.99",
+            "originalPrice": "$160.99",
+            "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-10%",
+            "rating": 4.5,
+            "brand": "Generic Brand",
+            "description": "Description for Hardware Item 22"
+        },
+        {
+            "id": 23,
+            "name": "Hardware Item 23",
+            "price": "$120.99",
+            "originalPrice": "$170.99",
+            "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-10%",
+            "rating": 4.5,
+            "brand": "Generic Brand",
+            "description": "Description for Hardware Item 23"
+        },
+        {
+            "id": 24,
+            "name": "Hardware Item 24",
+            "price": "$130.99",
+            "originalPrice": "$180.99",
+            "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-10%",
+            "rating": 4.5,
+            "brand": "Generic Brand",
+            "description": "Description for Hardware Item 24"
+        },
+        {
+            "id": 25,
+            "name": "Hardware Item 25",
+            "price": "$140.99",
+            "originalPrice": "$190.99",
+            "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-10%",
+            "rating": 4.5,
+            "brand": "Generic Brand",
+            "description": "Description for Hardware Item 25"
+        },
+        {
+            "id": 26,
+            "name": "Hardware Item 26",
+            "price": "$150.99",
+            "originalPrice": "$200.99",
+            "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-10%",
+            "rating": 4.5,
+            "brand": "Generic Brand",
+            "description": "Description for Hardware Item 26"
+        },
+        {
+            "id": 27,
+            "name": "Hardware Item 27",
+            "price": "$160.99",
+            "originalPrice": "$210.99",
+            "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-10%",
+            "rating": 4.5,
+            "brand": "Generic Brand",
+            "description": "Description for Hardware Item 27"
+        },
+        {
+            "id": 28,
+            "name": "Hardware Item 28",
+            "price": "$170.99",
+            "originalPrice": "$220.99",
+            "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-10%",
+            "rating": 4.5,
+            "brand": "Generic Brand",
+            "description": "Description for Hardware Item 28"
+        },
+        {
+            "id": 29,
+            "name": "Hardware Item 29",
+            "price": "$180.99",
+            "originalPrice": "$230.99",
+            "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-10%",
+            "rating": 4.5,
+            "brand": "Generic Brand",
+            "description": "Description for Hardware Item 29"
+        },
+        {
+            "id": 30,
+            "name": "Hardware Item 30",
+            "price": "$190.99",
+            "originalPrice": "$240.99",
+            "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-10%",
+            "rating": 4.5,
+            "brand": "Generic Brand",
+            "description": "Description for Hardware Item 30"
+        },
+        {
+            "id": 31,
+            "name": "Hardware Item 31",
+            "price": "$200.99",
+            "originalPrice": "$250.99",
+            "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-10%",
+            "rating": 4.5,
+            "brand": "Generic Brand",
+            "description": "Description for Hardware Item 31"
+        },
+        {
+            "id": 32,
+            "name": "Hardware Item 32",
+            "price": "$210.99",
+            "originalPrice": "$260.99",
+            "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-10%",
+            "rating": 4.5,
+            "brand": "Generic Brand",
+            "description": "Description for Hardware Item 32"
+        },
+        {
+            "id": 33,
+            "name": "Hardware Item 33",
+            "price": "$220.99",
+            "originalPrice": "$270.99",
+            "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-10%",
+            "rating": 4.5,
+            "brand": "Generic Brand",
+            "description": "Description for Hardware Item 33"
+        },
+        {
+            "id": 34,
+            "name": "Hardware Item 34",
+            "price": "$230.99",
+            "originalPrice": "$280.99",
+            "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-10%",
+            "rating": 4.5,
+            "brand": "Generic Brand",
+            "description": "Description for Hardware Item 34"
+        },
+        {
+            "id": 35,
+            "name": "Hardware Item 35",
+            "price": "$240.99",
+            "originalPrice": "$290.99",
+            "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-10%",
+            "rating": 4.5,
+            "brand": "Generic Brand",
+            "description": "Description for Hardware Item 35"
+        },
+        {
+            "id": 36,
+            "name": "Hardware Item 36",
+            "price": "$250.99",
+            "originalPrice": "$300.99",
+            "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-10%",
+            "rating": 4.5,
+            "brand": "Generic Brand",
+            "description": "Description for Hardware Item 36"
+        },
+        {
+            "id": 37,
+            "name": "Hardware Item 37",
+            "price": "$260.99",
+            "originalPrice": "$310.99",
+            "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-10%",
+            "rating": 4.5,
+            "brand": "Generic Brand",
+            "description": "Description for Hardware Item 37"
+        },
+        {
+            "id": 38,
+            "name": "Hardware Item 38",
+            "price": "$270.99",
+            "originalPrice": "$320.99",
+            "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-10%",
+            "rating": 4.5,
+            "brand": "Generic Brand",
+            "description": "Description for Hardware Item 38"
+        },
+        {
+            "id": 39,
+            "name": "Hardware Item 39",
+            "price": "$280.99",
+            "originalPrice": "$330.99",
+            "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-10%",
+            "rating": 4.5,
+            "brand": "Generic Brand",
+            "description": "Description for Hardware Item 39"
+        },
+        {
+            "id": 40,
+            "name": "Hardware Item 40",
+            "price": "$290.99",
+            "originalPrice": "$340.99",
+            "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-10%",
+            "rating": 4.5,
+            "brand": "Generic Brand",
+            "description": "Description for Hardware Item 40"
+        },
+        {
+            "id": 41,
+            "name": "Game Title 41",
+            "price": "$30.99",
+            "originalPrice": "$60.99",
+            "image": "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=400&q=80",
+            "category": "Game",
+            "discount": "-20%",
+            "rating": 4.2,
+            "brand": "Generic Studio",
+            "description": "Description for Game Title 41"
+        },
+        {
+            "id": 42,
+            "name": "Game Title 42",
+            "price": "$32.99",
+            "originalPrice": "$62.99",
+            "image": "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=400&q=80",
+            "category": "Game",
+            "discount": "-20%",
+            "rating": 4.2,
+            "brand": "Generic Studio",
+            "description": "Description for Game Title 42"
+        },
+        {
+            "id": 43,
+            "name": "Game Title 43",
+            "price": "$34.99",
+            "originalPrice": "$64.99",
+            "image": "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=400&q=80",
+            "category": "Game",
+            "discount": "-20%",
+            "rating": 4.2,
+            "brand": "Generic Studio",
+            "description": "Description for Game Title 43"
+        },
+        {
+            "id": 44,
+            "name": "Game Title 44",
+            "price": "$36.99",
+            "originalPrice": "$66.99",
+            "image": "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=400&q=80",
+            "category": "Game",
+            "discount": "-20%",
+            "rating": 4.2,
+            "brand": "Generic Studio",
+            "description": "Description for Game Title 44"
+        },
+        {
+            "id": 45,
+            "name": "Game Title 45",
+            "price": "$38.99",
+            "originalPrice": "$68.99",
+            "image": "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=400&q=80",
+            "category": "Game",
+            "discount": "-20%",
+            "rating": 4.2,
+            "brand": "Generic Studio",
+            "description": "Description for Game Title 45"
+        },
+        {
+            "id": 46,
+            "name": "Game Title 46",
+            "price": "$40.99",
+            "originalPrice": "$70.99",
+            "image": "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=400&q=80",
+            "category": "Game",
+            "discount": "-20%",
+            "rating": 4.2,
+            "brand": "Generic Studio",
+            "description": "Description for Game Title 46"
+        },
+        {
+            "id": 47,
+            "name": "Game Title 47",
+            "price": "$42.99",
+            "originalPrice": "$72.99",
+            "image": "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=400&q=80",
+            "category": "Game",
+            "discount": "-20%",
+            "rating": 4.2,
+            "brand": "Generic Studio",
+            "description": "Description for Game Title 47"
+        },
+        {
+            "id": 48,
+            "name": "Game Title 48",
+            "price": "$44.99",
+            "originalPrice": "$74.99",
+            "image": "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=400&q=80",
+            "category": "Game",
+            "discount": "-20%",
+            "rating": 4.2,
+            "brand": "Generic Studio",
+            "description": "Description for Game Title 48"
+        },
+        {
+            "id": 49,
+            "name": "Game Title 49",
+            "price": "$46.99",
+            "originalPrice": "$76.99",
+            "image": "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=400&q=80",
+            "category": "Game",
+            "discount": "-20%",
+            "rating": 4.2,
+            "brand": "Generic Studio",
+            "description": "Description for Game Title 49"
+        },
+        {
+            "id": 50,
+            "name": "Game Title 50",
+            "price": "$48.99",
+            "originalPrice": "$78.99",
+            "image": "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=400&q=80",
+            "category": "Game",
+            "discount": "-20%",
+            "rating": 4.2,
+            "brand": "Generic Studio",
+            "description": "Description for Game Title 50"
+        },
+        {
+            "id": 51,
+            "name": "Game Title 51",
+            "price": "$50.99",
+            "originalPrice": "$80.99",
+            "image": "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=400&q=80",
+            "category": "Game",
+            "discount": "-20%",
+            "rating": 4.2,
+            "brand": "Generic Studio",
+            "description": "Description for Game Title 51"
+        },
+        {
+            "id": 52,
+            "name": "Game Title 52",
+            "price": "$52.99",
+            "originalPrice": "$82.99",
+            "image": "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=400&q=80",
+            "category": "Game",
+            "discount": "-20%",
+            "rating": 4.2,
+            "brand": "Generic Studio",
+            "description": "Description for Game Title 52"
+        },
+        {
+            "id": 53,
+            "name": "Game Title 53",
+            "price": "$54.99",
+            "originalPrice": "$84.99",
+            "image": "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=400&q=80",
+            "category": "Game",
+            "discount": "-20%",
+            "rating": 4.2,
+            "brand": "Generic Studio",
+            "description": "Description for Game Title 53"
+        },
+        {
+            "id": 54,
+            "name": "Game Title 54",
+            "price": "$56.99",
+            "originalPrice": "$86.99",
+            "image": "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=400&q=80",
+            "category": "Game",
+            "discount": "-20%",
+            "rating": 4.2,
+            "brand": "Generic Studio",
+            "description": "Description for Game Title 54"
+        },
+        {
+            "id": 55,
+            "name": "Game Title 55",
+            "price": "$58.99",
+            "originalPrice": "$88.99",
+            "image": "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=400&q=80",
+            "category": "Game",
+            "discount": "-20%",
+            "rating": 4.2,
+            "brand": "Generic Studio",
+            "description": "Description for Game Title 55"
+        },
+        {
+            "id": 56,
+            "name": "Game Title 56",
+            "price": "$60.99",
+            "originalPrice": "$90.99",
+            "image": "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=400&q=80",
+            "category": "Game",
+            "discount": "-20%",
+            "rating": 4.2,
+            "brand": "Generic Studio",
+            "description": "Description for Game Title 56"
+        },
+        {
+            "id": 57,
+            "name": "Game Title 57",
+            "price": "$62.99",
+            "originalPrice": "$92.99",
+            "image": "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=400&q=80",
+            "category": "Game",
+            "discount": "-20%",
+            "rating": 4.2,
+            "brand": "Generic Studio",
+            "description": "Description for Game Title 57"
+        },
+        {
+            "id": 58,
+            "name": "Game Title 58",
+            "price": "$64.99",
+            "originalPrice": "$94.99",
+            "image": "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=400&q=80",
+            "category": "Game",
+            "discount": "-20%",
+            "rating": 4.2,
+            "brand": "Generic Studio",
+            "description": "Description for Game Title 58"
+        },
+        {
+            "id": 59,
+            "name": "Game Title 59",
+            "price": "$66.99",
+            "originalPrice": "$96.99",
+            "image": "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=400&q=80",
+            "category": "Game",
+            "discount": "-20%",
+            "rating": 4.2,
+            "brand": "Generic Studio",
+            "description": "Description for Game Title 59"
+        },
+        {
+            "id": 60,
+            "name": "Game Title 60",
+            "price": "$68.99",
+            "originalPrice": "$98.99",
+            "image": "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=400&q=80",
+            "category": "Game",
+            "discount": "-20%",
+            "rating": 4.2,
+            "brand": "Generic Studio",
+            "description": "Description for Game Title 60"
         }
     ]
-    return jsonify(mock_products)
+    
+    # Filter by category
+    category = request.args.get('category')
+    if category:
+        mock_products = [p for p in mock_products if p['category'].lower() == category.lower()]
 
-@products_bp.route('/api/deals')
-def get_deals():
-    game_deals = [
-        {"id": 1, "title": "Cyberpunk 2077", "price": "$29.99", "originalPrice": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&w=400&q=80", "rating": 4.5},
-        {"id": 2, "title": "Elden Ring", "price": "$39.99", "originalPrice": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=400&q=80", "rating": 5},
-        {"id": 3, "title": "God of War", "price": "$49.99", "category": "Action", "image": "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&w=400&q=80", "rating": 4.8},
-        {"id": 4, "title": "Starfield", "price": "$69.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1614680376593-902f74cf0d41?auto=format&fit=crop&w=400&q=80", "rating": 4.0},
-        {"id": 5, "title": "Baldur's Gate 3", "price": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", "rating": 5},
-        {"id": 11, "title": "Baldur's Gate 3", "price": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", "rating": 5},
-        {"id": 12, "title": "Baldur's Gate 3", "price": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", "rating": 5},
-        {"id": 13, "title": "Baldur's Gate 3", "price": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", "rating": 5},
-        {"id": 14, "title": "Baldur's Gate 3", "price": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", "rating": 5},
-        {"id": 15, "title": "Baldur's Gate 3", "price": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", "rating": 5},
-        {"id": 16, "title": "Baldur's Gate 3", "price": "$59.99", "category": "RPG", "image": "https://images.unsplash.com/photo-1612287230217-969e43c445bf?auto=format&fit=crop&w=400&q=80", "rating": 5},
-    ]
+    # Pagination logic
+    page = request.args.get('page', 1, type=int)
+    limit = request.args.get('limit', 48, type=int)
+    
+    total_products = len(mock_products)
+    total_pages = math.ceil(total_products / limit)
+    
+    start_index = (page - 1) * limit
+    end_index = start_index + limit
+    
+    paginated_products = mock_products[start_index:end_index]
+    
+    return jsonify({
+        "products": paginated_products,
+        "total_products": total_products,
+        "total_pages": total_pages,
+        "current_page": page
+    })
 
-    hardware_deals = [
-        {"id": 6, "title": "RTX 4090", "price": "$1599.99", "category": "GPU", "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=400&q=80", "rating": 4.9},
-        {"id": 7, "title": "Ryzen 9 7950X", "price": "$599.99", "originalPrice": "$699.99", "category": "CPU", "image": "https://images.unsplash.com/photo-1555616635-640960031520?auto=format&fit=crop&w=400&q=80", "rating": 4.7},
-        {"id": 8, "title": "Logitech G Pro", "price": "$99.99", "category": "Mouse", "image": "https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?auto=format&fit=crop&w=400&q=80", "rating": 4.6},
-        {"id": 9, "title": "Corsair K70", "price": "$129.99", "category": "Keyboard", "image": "https://images.unsplash.com/photo-1587829741301-dc798b91a603?auto=format&fit=crop&w=400&q=80", "rating": 4.5},
-        {"id": 10, "title": "Samsung Odyssey", "price": "$999.99", "category": "Monitor", "image": "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=400&q=80", "rating": 4.4},
-    ]
 
-    return jsonify({"game_deals": game_deals, "hardware_deals": hardware_deals})
