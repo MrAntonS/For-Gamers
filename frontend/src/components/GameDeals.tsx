@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ProductCard from './ProductCard';
+import Pagination from './Pagination';
 import { API_BASE_URL } from '../config';
 
 interface GameDeal {
@@ -209,50 +210,11 @@ const GameDeals = () => {
         </div>
 
         {/* Pagination */}
-        <div className="p-4 border-t border-gray-800 bg-black z-10">
-          <div className="flex justify-center space-x-2 flex-wrap gap-y-2">
-            <button 
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1 rounded border border-gray-700 text-gray-400 hover:text-white hover:border-white disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              &lt;
-            </button>
-            
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
-              // Simple logic to show first, last, current, and neighbors
-              if (
-                page === 1 || 
-                page === totalPages || 
-                (page >= currentPage - 1 && page <= currentPage + 1)
-              ) {
-                return (
-                  <button 
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`px-3 py-1 rounded border ${currentPage === page ? 'bg-red-600 border-red-600 text-white font-bold' : 'border-gray-700 text-gray-400 hover:text-white hover:border-white'}`}
-                  >
-                    {page}
-                  </button>
-                );
-              } else if (
-                (page === currentPage - 2 && currentPage > 3) || 
-                (page === currentPage + 2 && currentPage < totalPages - 2)
-              ) {
-                 return <span key={page} className="px-2 py-1 text-gray-500">...</span>;
-              }
-              return null;
-            })}
-
-            <button 
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1 rounded border border-gray-700 text-gray-400 hover:text-white hover:border-white disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              &gt;
-            </button>
-          </div>
-        </div>
+        <Pagination 
+          currentPage={currentPage} 
+          totalPages={totalPages} 
+          onPageChange={setCurrentPage} 
+        />
       </main>
     </div>
   );

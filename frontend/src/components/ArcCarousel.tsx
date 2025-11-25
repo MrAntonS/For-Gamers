@@ -20,6 +20,7 @@ interface ArcCarouselProps {
 
 const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage }) => {
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef<number>(0);
   const lastScrollTime = useRef<number>(0);
@@ -33,7 +34,7 @@ const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage })
   
   // Auto-scroll
   useEffect(() => {
-    if (totalItems === 0) return;
+    if (totalItems === 0 || isHovered) return;
     
     const animate = (time: number) => {
       if (time - lastScrollTime.current > 16) { // Cap at ~60fps
@@ -50,7 +51,7 @@ const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage })
     return () => {
       if (autoScrollRef.current) cancelAnimationFrame(autoScrollRef.current);
     };
-  }, [totalItems]);
+  }, [totalItems, isHovered]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.stopPropagation();
@@ -138,6 +139,8 @@ const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage })
     <div 
       ref={containerRef}
       onWheel={handleWheel}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       className={`absolute top-0 bottom-0 w-[350px] hidden lg:flex items-center justify-center z-10 ${side === 'left' ? 'left-0' : 'right-0'}`}
     >
       <div className="relative w-full h-full">
@@ -146,7 +149,7 @@ const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage })
              <ProductCard
                 {...item}
                 width="240px"
-                height="auto"
+                height="350px"
                 className="shadow-2xl"
                 enableHoverReveal={true}
                 fallbackImage={fallbackImage}
