@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ProductCard from './ProductCard';
 
 export interface DealItem {
@@ -9,6 +9,7 @@ export interface DealItem {
   image: string;
   category: string;
   rating?: number;
+  description?: string;
 }
 
 interface ArcCarouselProps {
@@ -18,155 +19,143 @@ interface ArcCarouselProps {
 }
 
 const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage }) => {
-  const [activeIndex, setActiveIndex] = useState(Math.floor(items.length / 2));
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const isScrollingRef = useRef(false);
+  const autoScrollRef = useRef<number>(0);
+  const lastScrollTime = useRef<number>(0);
 
-  // Auto-scroll effect
+  // Configuration
+  const VISIBLE_ITEMS = 6; 
+  const RADIUS_X = 250; 
+  const RADIUS_Y = 500; 
+  
+  const totalItems = items.length;
+  
+  // Auto-scroll
   useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveIndex((prev) => (prev + 1) % items.length);
-    }, 15000);
-    return () => clearInterval(interval);
-  }, [items.length, activeIndex]);
-
-  const handleWheel = (e: React.WheelEvent) => {
-    if (isScrollingRef.current) return;
-
-    isScrollingRef.current = true;
-    setTimeout(() => {
-      isScrollingRef.current = false;
-    }, 500);
-
-    if (e.deltaY > 0) {
-      setActiveIndex((prev) => (prev + 1) % items.length);
-    } else {
-      setActiveIndex((prev) => (prev - 1 + items.length) % items.length);
-    }
-  };
-
-  const handleCardClick = (index: number) => {
-    if (isScrollingRef.current) return;
-
-    let diff = index - activeIndex;
-    // Normalize diff for shortest path
-    if (diff > items.length / 2) diff -= items.length;
-    if (diff < -items.length / 2) diff += items.length;
-
-    if (diff === 0) return;
-
-    const direction = diff > 0 ? 1 : -1;
-    const steps = Math.abs(diff);
+    if (totalItems === 0 || isHovered) return;
     
-    isScrollingRef.current = true;
-    let stepCount = 0;
-
-    const interval = setInterval(() => {
-      setActiveIndex((prev) => {
-        let next = prev + direction;
-        if (next < 0) next += items.length;
-        if (next >= items.length) next -= items.length;
-        return next;
-      });
-      
-      stepCount++;
-      if (stepCount === steps) {
-        clearInterval(interval);
-        setTimeout(() => {
-          isScrollingRef.current = false;
-        }, 500);
+    const animate = (time: number) => {
+      if (time - lastScrollTime.current > 16) { // Cap at ~60fps
+        setScrollProgress(prev => {
+            const next = prev + 0.002; // Slow auto-scroll
+            return next % totalItems;
+        });
+        lastScrollTime.current = time;
       }
-    }, 150);
-  };
+      autoScrollRef.current = requestAnimationFrame(animate);
+    };
+    autoScrollRef.current = requestAnimationFrame(animate);
+    
+    return () => {
+      if (autoScrollRef.current) cancelAnimationFrame(autoScrollRef.current);
+    };
+  }, [totalItems, isHovered]);
 
-  // Prevent default scroll behavior when hovering the carousel
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.stopPropagation();
+    // e.preventDefault(); // React synthetic events can't always prevent default passive listeners
+    
+    const delta = e.deltaY * 0.001; // Sensitivity
+    setScrollProgress(prev => {
+      let next = prev + delta;
+      // Normalize
+      if (next < 0) next += totalItems;
+      if (next >= totalItems) next -= totalItems;
+      return next;
+    });
+  }, [totalItems]);
+
+  // Prevent default scroll on the container to avoid scrolling the page
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-
-    const preventDefault = (e: WheelEvent) => {
-      e.preventDefault();
-    };
-
+    const preventDefault = (e: WheelEvent) => e.preventDefault();
     container.addEventListener('wheel', preventDefault, { passive: false });
-    return () => {
-      container.removeEventListener('wheel', preventDefault);
-    };
+    return () => container.removeEventListener('wheel', preventDefault);
   }, []);
+
+  const getItemStyle = (index: number) => {
+    if (totalItems === 0) return { display: 'none' };
+
+    let offset = index - scrollProgress;
+    
+    // Shortest path wrapping
+    while (offset < -totalItems / 2) offset += totalItems;
+    while (offset > totalItems / 2) offset -= totalItems;
+    
+    // Visibility check
+    if (Math.abs(offset) > VISIBLE_ITEMS / 2 + 1) {
+      return { display: 'none' };
+    }
+
+    // Map offset to angle. 
+    // We want the visible items to span a certain angle range.
+    // Let's say we want to span 120 degrees (PI * 2/3).
+    const angleSpread = Math.PI * 0.6; 
+    const angle = offset * (angleSpread / (VISIBLE_ITEMS / 2));
+    
+    // Calculate position
+    const y = Math.sin(angle) * RADIUS_Y;
+    const xOffset = Math.cos(angle) * RADIUS_X;
+    
+    let x, rotate;
+    
+    if (side === 'left') {
+        // Arc bows right )
+        // Center is to the left.
+        // At angle 0 (center), x should be max (closest to screen center).
+        // x = -RADIUS_X + xOffset.
+        // We want to shift it so it's visible.
+        x = -RADIUS_X + xOffset + 20; 
+        rotate = angle * (180 / Math.PI) * 0.3;
+    } else {
+        // Arc bows left (
+        // Center is to the right.
+        x = RADIUS_X - xOffset - 20;
+        rotate = -angle * (180 / Math.PI) * 0.3;
+    }
+
+    const scale = Math.max(0.6, Math.cos(angle));
+    const opacity = Math.max(0, Math.cos(angle));
+    const zIndex = Math.round(scale * 100);
+
+    return {
+      transform: `translate3d(${x}px, ${y}px, 0) translateY(-50%) scale(${scale}) rotate(${rotate}deg)`,
+      opacity,
+      zIndex,
+      position: 'absolute' as const,
+      top: '50%',
+      left: side === 'left' ? '0' : 'auto',
+      right: side === 'right' ? '0' : 'auto',
+      // Center the item itself
+      marginLeft: side === 'left' ? '50px' : '0',
+      marginRight: side === 'right' ? '50px' : '0',
+    };
+  };
 
   return (
     <div 
       ref={containerRef}
       onWheel={handleWheel}
-      className={`absolute top-1/2 -translate-y-1/2 h-[400px] 2xl:h-[40vh] w-[250px] 2xl:w-[17.5vw] hidden lg:flex items-center justify-center z-10 ${side === 'left' ? 'left-4' : 'right-4'}`}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className={`absolute top-0 bottom-0 w-[350px] hidden lg:flex items-center justify-center z-10 ${side === 'left' ? 'left-0' : 'right-0'}`}
     >
       <div className="relative w-full h-full">
-        {items.map((item, index) => {
-          // Calculate circular offset
-          let offset = index - activeIndex;
-          if (offset > items.length / 2) offset -= items.length;
-          if (offset < -items.length / 2) offset += items.length;
-          
-          // Configuration for the arc
-          const ySpacing = 66.6; // Percentage of card height
-          const xCurve = 43.75;    // Percentage of card width
-          const rotation = 15;  
-          const scaleStep = 0.1; 
-          const opacityStep = 0.2; // Less opacity fade to see more items
-
-          // Calculate transforms
-          // We limit the visible range to keep it clean (e.g., +/- 3 items)
-          if (Math.abs(offset) > 3) return null;
-
-          const translateY = offset * ySpacing;
-          
-          // If side is left, active item is right-most (closest to center screen)
-          // Items move LEFT as they move away from center index
-          // If side is right, active item is left-most (closest to center screen)
-          // Items move RIGHT as they move away from center index
-          
-          let translateX = 0;
-          let rotateZ = 0;
-
-          if (side === 'left') {
-             // Curve like (
-             // Active item at x=0 (relative to right edge of container ideally, but here centered)
-             // Let's say container is aligned. 
-             // We want the curve to bow OUT towards the center of the screen.
-             // So active item is closest to center.
-             translateX = -Math.abs(offset) * xCurve;
-             rotateZ = -offset * rotation;
-          } else {
-             // Curve like )
-             translateX = Math.abs(offset) * xCurve;
-             rotateZ = offset * rotation;
-          }
-
-          const scale = 1 - Math.abs(offset) * scaleStep;
-          const opacity = 1 - Math.abs(offset) * opacityStep;
-          const zIndex = 100 - Math.abs(offset);
-
-          return (
-            <ProductCard
-              key={item.id}
-              id={item.id}
-              title={item.title}
-              price={item.price}
-              originalPrice={item.originalPrice}
-              image={item.image}
-              category={item.category}
-              rating={item.rating}
-              fallbackImage={fallbackImage}
-              className="absolute top-1/2 left-1/2 w-40 2xl:w-[11vw] aspect-2/3 h-auto"
-              style={{
-                transform: `translate(-50%, -50%) translateY(${translateY}%) translateX(${translateX}%) rotate(${rotateZ}deg) scale(${scale})`,
-                zIndex,
-                opacity: Math.max(opacity, 0),
-              }}
-              onClick={() => handleCardClick(index)}
-            />
-          );
-        })}
+        {items.map((item, index) => (
+          <div key={item.id} style={getItemStyle(index)} className="will-change-transform">
+             <ProductCard
+                {...item}
+                width="240px"
+                height="350px"
+                className="shadow-2xl"
+                enableHoverReveal={true}
+                fallbackImage={fallbackImage}
+             />
+          </div>
+        ))}
       </div>
     </div>
   );
