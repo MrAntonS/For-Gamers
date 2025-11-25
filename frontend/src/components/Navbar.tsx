@@ -1,6 +1,13 @@
 import { Link } from 'react-router-dom';
+import { FaShoppingCart } from 'react-icons/fa';
+import { useCart } from '../contexts/CartContext';
+import { useState } from 'react';
+import Cart from './Cart';
 
 const Navbar = () => {
+  const { cartCount } = useCart();
+  const [isCartOpen, setIsCartOpen] = useState(false);
+
   const navItems = [
     { name: "Min-Max build", href: "/minmax" },
     { name: "Game Deals", href: "/deals/games" },
@@ -9,7 +16,8 @@ const Navbar = () => {
   ];
 
   return (
-    <nav className="bg-black text-white border-b border-red-600">
+    <>
+      <nav className="bg-black text-white border-b border-red-600">
       <div className="w-full px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Left Section: Logo & Nav */}
@@ -50,8 +58,21 @@ const Navbar = () => {
               </div>
             </div>
 
-            {/* Login/Signup */}
-            <div className="hidden md:flex items-center">
+            {/* Login/Signup & Cart */}
+            <div className="hidden md:flex items-center gap-4">
+              {/* Cart Icon */}
+              <button 
+                onClick={() => setIsCartOpen(true)}
+                className="relative text-white hover:text-red-500 transition-colors"
+              >
+                <FaShoppingCart size={24} />
+                {cartCount > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                    {cartCount}
+                  </span>
+                )}
+              </button>
+
               <button className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200">
                 Login / Sign Up
               </button>
@@ -71,6 +92,10 @@ const Navbar = () => {
         </div>
       </div>
     </nav>
+    
+    {/* Cart Sidebar */}
+    <Cart isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
+  </>
   );
 };
 

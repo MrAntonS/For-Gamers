@@ -424,6 +424,7 @@ const ProductList = () => {
                   image={product.image}
                   category={product.category}
                   rating={product.rating}
+                  brand={product.brand}
                   className="h-[350px]"
                   enableHoverReveal={true}
                   description={product.description}
