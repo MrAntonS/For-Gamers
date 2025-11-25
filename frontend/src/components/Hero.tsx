@@ -10,11 +10,39 @@ const Hero = () => {
   useEffect(() => {
     const fetchDeals = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/deals`);
+        const response = await fetch(`${API_BASE_URL}/api/products?limit=50`);
         if (response.ok) {
           const data = await response.json();
-          setGameDeals(data.game_deals);
-          setHardwareDeals(data.hardware_deals);
+          const products = data.products;
+          
+          const games = products
+            .filter((p: any) => p.category === 'Game')
+            .map((p: any) => ({
+              id: p.id,
+              title: p.name,
+              price: p.price,
+              originalPrice: p.originalPrice,
+              image: p.image,
+              category: p.category,
+              rating: p.rating,
+              description: p.description
+            }));
+
+          const hardware = products
+            .filter((p: any) => p.category === 'Hardware')
+            .map((p: any) => ({
+              id: p.id,
+              title: p.name,
+              price: p.price,
+              originalPrice: p.originalPrice,
+              image: p.image,
+              category: p.category,
+              rating: p.rating,
+              description: p.description
+            }));
+
+          setGameDeals(games);
+          setHardwareDeals(hardware);
         }
       } catch (error) {
         console.error('Failed to fetch deals:', error);

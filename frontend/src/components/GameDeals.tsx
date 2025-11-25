@@ -10,6 +10,7 @@ interface GameDeal {
   category: string;
   image: string;
   rating: number;
+  description?: string;
 }
 
 const FilterSection = ({ title, children }: { title: string, children: React.ReactNode }) => (
@@ -45,12 +46,22 @@ const GameDeals = () => {
     const fetchGames = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`${API_BASE_URL}/api/deals?page=${currentPage}&limit=18`);
+        const response = await fetch(`${API_BASE_URL}/api/products?category=Game&page=${currentPage}&limit=18`);
         if (!response.ok) {
           throw new Error('Failed to fetch game deals');
         }
         const data = await response.json();
-        setGames(data.game_deals || []);
+        const mappedGames = data.products.map((p: any) => ({
+          id: p.id,
+          title: p.name,
+          price: p.price,
+          originalPrice: p.originalPrice,
+          category: p.category,
+          image: p.image,
+          rating: p.rating,
+          description: p.description
+        }));
+        setGames(mappedGames);
         setTotalPages(data.total_pages || 1);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
@@ -189,8 +200,8 @@ const GameDeals = () => {
                   image={game.image}
                   category={game.category}
                   rating={game.rating}
+                  description={game.description}
                   className="h-[350px]"
-                  enableHoverReveal={false}
                 />
               ))}
             </div>
