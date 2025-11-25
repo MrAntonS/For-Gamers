@@ -1,4 +1,5 @@
 import React from 'react';
+import { useCart } from '../contexts/CartContext';
 
 export interface ProductCardProps {
   id?: number;
@@ -17,9 +18,11 @@ export interface ProductCardProps {
   description?: string; // Keeping for compatibility but might not be used in this design
   enableHoverReveal?: boolean; // Keeping for compatibility
   fallbackImage?: string;
+  brand?: string;
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ 
+  id,
   title, 
   price, 
   originalPrice, 
@@ -36,6 +39,21 @@ const ProductCard: React.FC<ProductCardProps> = ({
   showAddToCart = true,
   fallbackImage = "https://placehold.co/400x600?text=No+Image"
 }) => {
+  const { addToCart } = useCart();
+
+  const handleAddToCart = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (id) {
+      addToCart({
+        id,
+        name: title,
+        price,
+        image,
+        category,
+        originalPrice
+      });
+    }
+  };
   
   const containerStyle = {
     ...style,
@@ -92,7 +110,12 @@ const ProductCard: React.FC<ProductCardProps> = ({
         )}
 
         {showAddToCart && !enableHoverReveal && (
-          <button className="mt-2 2xl:mt-3 w-full bg-white text-black text-xs 2xl:text-sm font-bold py-1 2xl:py-2 rounded hover:bg-gray-200 transition-colors shrink-0">Add to Cart</button>
+          <button 
+            onClick={handleAddToCart}
+            className="mt-2 2xl:mt-3 w-full bg-white text-black text-xs 2xl:text-sm font-bold py-1 2xl:py-2 rounded hover:bg-gray-200 transition-colors"
+          >
+            Add to Cart
+          </button>
         )}
       </div>
 
@@ -127,7 +150,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
           )}
           
           {showAddToCart && (
-            <button className="mt-auto w-full bg-white text-black text-xs 2xl:text-sm font-bold py-1 2xl:py-2 rounded hover:bg-gray-200 transition-colors">
+            <button 
+              onClick={handleAddToCart}
+              className="mt-auto w-full bg-white text-black text-xs 2xl:text-sm font-bold py-1 2xl:py-2 rounded hover:bg-gray-200 transition-colors"
+            >
               Add to Cart
             </button>
           )}
