@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { FaShoppingCart } from 'react-icons/fa';
 import { useCart } from '../contexts/CartContext';
 import { useState } from 'react';
@@ -7,6 +7,8 @@ import Cart from './Cart';
 const Navbar = () => {
   const { cartCount } = useCart();
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate();
 
   const navItems = [
     { name: "Min-Max build", href: "/minmax" },
@@ -14,6 +16,13 @@ const Navbar = () => {
     { name: "Hardware Deals", href: "/deals/hardware" },
     { name: "Best Accessories", href: "#" },
   ];
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
 
   return (
     <>
@@ -43,7 +52,7 @@ const Navbar = () => {
           {/* Right Section: Search & Login */}
           <div className="flex items-center justify-end flex-1">
             {/* Search Bar */}
-            <div className="max-w-md w-full mx-4 hidden md:block">
+            <form onSubmit={handleSearch} className="max-w-md w-full mx-4 hidden md:block">
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
@@ -52,11 +61,13 @@ const Navbar = () => {
                 </div>
                 <input
                   type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   className="block w-full pl-10 pr-3 py-2 border border-gray-700 rounded-md leading-5 bg-gray-900 text-gray-300 placeholder-gray-400 focus:outline-none focus:bg-black focus:border-red-600 focus:ring-1 focus:ring-red-600 sm:text-sm"
                   placeholder="Search for games or hardware"
                 />
               </div>
-            </div>
+            </form>
 
             {/* Login/Signup & Cart */}
             <div className="hidden md:flex items-center gap-4">

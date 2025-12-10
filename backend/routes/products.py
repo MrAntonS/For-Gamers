@@ -738,6 +738,16 @@ def get_products():
     if category:
         mock_products = [p for p in mock_products if p['category'].lower() == category.lower()]
 
+    # Search filter - search in name, description, and brand
+    search_query = request.args.get('search', '').strip().lower()
+    if search_query:
+        mock_products = [
+            p for p in mock_products 
+            if search_query in p['name'].lower() 
+            or search_query in p.get('description', '').lower()
+            or search_query in p.get('brand', '').lower()
+        ]
+
     # Pagination logic
     page = request.args.get('page', 1, type=int)
     limit = request.args.get('limit', 48, type=int)
