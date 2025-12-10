@@ -7,8 +7,18 @@ This document outlines the available backend API endpoints provided by the Flask
 ### 1. Get All Products
 - **Endpoint:** `GET /api/products`
 - **Blueprint:** `products_bp`
-- **Description:** Retrieves a list of all available products, including both games and hardware.
-- **Response:** JSON array of product objects. Each object contains:
+- **Description:** Retrieves a list of all available products, including both games and hardware. Supports filtering by category and search.
+- **Query Parameters:**
+    - `page` (optional): Page number for pagination (default: 1)
+    - `limit` (optional): Number of items per page (default: 48)
+    - `category` (optional): Filter by category ("Game" or "Hardware")
+    - `search` (optional): Search query to filter products by name, description, or brand
+- **Response:** JSON object containing:
+    - `products`: Array of product objects
+    - `total_products`: Total number of products matching the query
+    - `total_pages`: Total number of pages
+    - `current_page`: Current page number
+- **Product Object Properties:**
     - `id`: Unique identifier
     - `name`: Product name
     - `price`: Current price
@@ -19,6 +29,13 @@ This document outlines the available backend API endpoints provided by the Flask
     - `rating`: Product rating (0-5)
     - `brand`: Manufacturer or Publisher
     - `description`: Product description
+
+### 2. Search Products
+- **Endpoint:** `GET /api/products?search=<query>`
+- **Description:** Search for products by name, description, or brand. The search is case-insensitive.
+- **Example:** `/api/products?search=cyberpunk` - Returns all products containing "cyberpunk" in name, description, or brand.
+- **Combined Filters:** Search can be combined with category filter:
+    - `/api/products?search=rtx&category=Hardware` - Search for "rtx" in hardware only
 
 ## MinMax Analysis API
 
