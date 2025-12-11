@@ -71,4 +71,25 @@ jobs:
           # Clean up the .tar files and dangling images
           rm frontend.tar backend.tar
           docker image prune -f
+
+          # Post-deployment health check
+          echo "Waiting 60 seconds for services to stabilize..."
+          sleep 60
+
+          echo "Checking service status..."
+          docker compose ps
+
+          # Verify all services are running
+          RUNNING_SERVICES=$(docker compose ps --services --filter "status=running")
+          
+          for SERVICE in backend frontend db; do
+            if ! echo "$RUNNING_SERVICES" | grep -q "$SERVICE"; then
+              echo "CRITICAL: $SERVICE is not running!"
+              echo "Logs for $SERVICE:"
+              docker compose logs $SERVICE --tail=50
+              exit 1
+            fi
+          done
+
+          echo "Deployment successful! All services are running."
         EOF
