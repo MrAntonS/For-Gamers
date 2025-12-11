@@ -7,27 +7,30 @@ import HardwareDeals from './components/HardwareDeals'
 import MinMaxTab from './components/MinMaxTab'
 import SearchResults from './components/SearchResults'
 import { CartProvider } from './contexts/CartContext'
+import { AuthProvider } from './contexts/AuthContext'
 import './App.css'
 
 function App() {
   return (
-    <CartProvider>
-      <Router>
-        <div className="h-screen overflow-hidden bg-black text-white flex flex-col">
-          <Navbar />
-          <div className="flex-1 overflow-auto">
-            <Routes>
-              <Route path="/" element={<Hero />} />
-              <Route path="/deals" element={<ProductList />} />
-              <Route path="/deals/games" element={<GameDeals />} />
-              <Route path="/deals/hardware" element={<HardwareDeals />} />
-              <Route path="/minmax" element={<MinMaxTab />} />
-              <Route path="/search" element={<SearchResults />} />
-            </Routes>
+    <AuthProvider>
+      <CartProvider>
+        <Router>
+          <div className="h-screen overflow-hidden bg-black text-white flex flex-col">
+            <Navbar />
+            <div className="flex-1 overflow-auto">
+              <Routes>
+                <Route path="/" element={<Hero />} />
+                <Route path="/deals" element={<ProductList />} />
+                <Route path="/deals/games" element={<GameDeals />} />
+                <Route path="/deals/hardware" element={<HardwareDeals />} />
+                <Route path="/minmax" element={<MinMaxTab />} />
+                <Route path="/search" element={<SearchResults />} />
+              </Routes>
+            </div>
           </div>
-        </div>
-      </Router>
-    </CartProvider>
+        </Router>
+      </CartProvider>
+    </AuthProvider>
   )
 }
 

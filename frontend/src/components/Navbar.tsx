@@ -1,12 +1,17 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { FaShoppingCart } from 'react-icons/fa';
+import { FaShoppingCart, FaUser, FaSignOutAlt } from 'react-icons/fa';
 import { useCart } from '../contexts/CartContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useState } from 'react';
 import Cart from './Cart';
+import AuthModal from './AuthModal';
 
 const Navbar = () => {
   const { cartCount } = useCart();
+  const { user, isAuthenticated, logout } = useAuth();
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
 
@@ -84,9 +89,43 @@ const Navbar = () => {
                 )}
               </button>
 
-              <button className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200">
-                Login / Sign Up
-              </button>
+              {isAuthenticated && user ? (
+                <div className="relative">
+                  <button 
+                    onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                    className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200"
+                  >
+                    <FaUser />
+                    <span>{user.username}</span>
+                  </button>
+                  
+                  {isUserMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-gray-900 border border-gray-700 rounded-md shadow-lg z-50">
+                      <div className="px-4 py-2 border-b border-gray-700">
+                        <p className="text-sm text-gray-400">Signed in as</p>
+                        <p className="text-sm font-medium text-white truncate">{user.email}</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          logout();
+                          setIsUserMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-red-500 transition-colors"
+                      >
+                        <FaSignOutAlt />
+                        <span>Sign out</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <button 
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200"
+                >
+                  Login / Sign Up
+                </button>
+              )}
             </div>
           </div>
 
@@ -106,6 +145,9 @@ const Navbar = () => {
     
     {/* Cart Sidebar */}
     <Cart isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
+    
+    {/* Auth Modal */}
+    <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
   </>
   );
 };

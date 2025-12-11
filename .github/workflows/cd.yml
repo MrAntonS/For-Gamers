@@ -33,8 +33,13 @@ jobs:
       run: scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa docker-compose.prod.yml frontend.tar backend.tar ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }}:~/
 
     - name: Deploy on VM
+      env:
+        DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
       run: |
-        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }} << 'EOF'
+        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }} << EOF
+          # Export the password so docker compose can use it
+          export POSTGRES_PASSWORD=$DB_PASSWORD
+
           # Rename prod compose file to standard name for convenience
           mv docker-compose.prod.yml docker-compose.yml
 
