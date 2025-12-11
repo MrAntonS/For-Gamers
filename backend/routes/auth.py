@@ -2,12 +2,10 @@ from flask import Blueprint, jsonify, request, session
 import secrets
 import re
 import bcrypt
+from sqlalchemy import func
+from models import db, User
 
 auth_bp = Blueprint('auth_bp', __name__)
-
-# In-memory user storage for demo purposes
-# In production, this would be a database
-users_db = {}
 
 # Email validation regex pattern (RFC 5322 simplified)
 EMAIL_PATTERN = re.compile(
@@ -70,22 +68,24 @@ def signup():
         return jsonify({"error": "Password must be at least 8 characters"}), 400
     
     # Check if user already exists
-    if email in users_db:
+    if User.query.filter_by(email=email).first():
         return jsonify({"error": "An account with this email already exists"}), 409
     
     # Check if username is taken
-    for user in users_db.values():
-        if user['username'].lower() == username.lower():
-            return jsonify({"error": "Username is already taken"}), 409
+    if User.query.filter(func.lower(User.username) == username.lower()).first():
+        return jsonify({"error": "Username is already taken"}), 409
     
     # Create user
     user_id = secrets.token_hex(16)
-    users_db[email] = {
-        'id': user_id,
-        'username': username,
-        'email': email,
-        'password_hash': hash_password(password)
-    }
+    new_user = User(
+        id=user_id,
+        username=username,
+        email=email,
+        password_hash=hash_password(password)
+    )
+    
+    db.session.add(new_user)
+    db.session.commit()
     
     # Set session
     session['user_id'] = user_id
@@ -94,11 +94,7 @@ def signup():
     
     return jsonify({
         "message": "Account created successfully",
-        "user": {
-            "id": user_id,
-            "username": username,
-            "email": email
-        }
+        "user": new_user.to_dict()
     }), 201
 
 
@@ -120,26 +116,22 @@ def login():
         return jsonify({"error": "Email and password are required"}), 400
     
     # Find user
-    user = users_db.get(email)
+    user = User.query.filter_by(email=email).first()
     if not user:
         return jsonify({"error": "Invalid email or password"}), 401
     
     # Verify password
-    if not verify_password(password, user['password_hash']):
+    if not verify_password(password, user.password_hash):
         return jsonify({"error": "Invalid email or password"}), 401
     
     # Set session
-    session['user_id'] = user['id']
-    session['username'] = user['username']
-    session['email'] = user['email']
+    session['user_id'] = user.id
+    session['username'] = user.username
+    session['email'] = user.email
     
     return jsonify({
         "message": "Login successful",
-        "user": {
-            "id": user['id'],
-            "username": user['username'],
-            "email": user['email']
-        }
+        "user": user.to_dict()
     })
 
 

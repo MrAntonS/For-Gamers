@@ -2,9 +2,16 @@ import os
 import secrets
 from flask import Flask
 from flask_cors import CORS
+from models import db
 
 def create_app():
     app = Flask(__name__)
+    
+    # Configure Database
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///local.db')
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    
+    db.init_app(app)
     
     # Configure secret key for sessions
     # In production, SECRET_KEY must be set in environment
@@ -31,10 +38,15 @@ def create_app():
     ])
 
     with app.app_context():
+        # Create database tables
+        db.create_all()
+
         try:
-            from .routes import products, minmax, auth
-        except ImportError:
             from routes import products, minmax, auth
+        except ImportError:
+            # Fallback if running from a different context
+            from .routes import products, minmax, auth
+        
         app.register_blueprint(products.products_bp)
         app.register_blueprint(minmax.minmax_bp)
         app.register_blueprint(auth.auth_bp)
