@@ -34,7 +34,8 @@ def create_app():
         'http://localhost:5173',  # Vite dev server
         'http://localhost:3000',
         'http://127.0.0.1:5173',
-        'http://127.0.0.1:3000'
+        'http://127.0.0.1:3000',
+        'http://129.158.206.217'  # Production IP
     ])
 
     with app.app_context():
