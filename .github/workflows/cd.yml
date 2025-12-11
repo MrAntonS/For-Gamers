@@ -77,16 +77,14 @@ jobs:
           sleep 60
 
           echo "Checking service status..."
-          docker compose ps
+          docker compose ps -a
 
           # Verify all services are running
-          RUNNING_SERVICES=$(docker compose ps --services --filter "status=running")
-          
           for SERVICE in backend frontend db; do
-            if ! echo "$RUNNING_SERVICES" | grep -q "$SERVICE"; then
+            if [ -z "$(docker compose ps -q $SERVICE --filter "status=running")" ]; then
               echo "CRITICAL: $SERVICE is not running!"
               echo "Logs for $SERVICE:"
-              docker compose logs $SERVICE --tail=50
+              docker compose logs $SERVICE --tail=100
               exit 1
             fi
           done
