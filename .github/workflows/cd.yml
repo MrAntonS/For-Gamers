@@ -35,10 +35,12 @@ jobs:
     - name: Deploy on VM
       env:
         DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        SECRET_KEY: ${{ secrets.SECRET_KEY }}
       run: |
         ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }} << EOF
-          # Export the password so docker compose can use it
+          # Export secrets so docker compose can use them
           export POSTGRES_PASSWORD=$DB_PASSWORD
+          export SECRET_KEY=$SECRET_KEY
 
           # Rename prod compose file to standard name for convenience
           mv docker-compose.prod.yml docker-compose.yml
@@ -81,10 +83,10 @@ jobs:
 
           # Verify all services are running
           for SERVICE in backend frontend db; do
-            if [ -z "$(docker compose ps -q $SERVICE --filter "status=running")" ]; then
-              echo "CRITICAL: $SERVICE is not running!"
-              echo "Logs for $SERVICE:"
-              docker compose logs $SERVICE --tail=100
+            if [ -z "\$(docker compose ps -q \$SERVICE --filter "status=running")" ]; then
+              echo "CRITICAL: \$SERVICE is not running!"
+              echo "Logs for \$SERVICE:"
+              docker compose logs \$SERVICE --tail=100
               exit 1
             fi
           done
