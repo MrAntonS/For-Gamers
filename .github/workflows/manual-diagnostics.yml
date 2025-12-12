@@ -29,23 +29,35 @@ jobs:
         env:
           TAIL_LINES: ${{ inputs.tail_lines }}
           INCLUDE_EXTERNAL_CHECKS: ${{ inputs.include_external_checks }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          SECRET_KEY: ${{ secrets.SECRET_KEY }}
-          STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
-          EBAY_API_KEY: ${{ secrets.EBAY_API_KEY }}
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }} << EOF
-            set -e
+            # Avoid set -e so we still print partial diagnostics on failures.
+            set +e
 
             TAIL_LINES="${TAIL_LINES:-300}"
             INCLUDE_EXTERNAL_CHECKS="${INCLUDE_EXTERNAL_CHECKS:-true}"
 
-            # Make sure docker compose can substitute variables in docker-compose.yml.
-            # GitHub secrets exist on the runner, not on the VM, so we pass them through this SSH session.
-            export POSTGRES_PASSWORD="${DB_PASSWORD}"
-            export SECRET_KEY="${SECRET_KEY}"
-            export STEAM_API_KEY="${STEAM_API_KEY}"
-            export EBAY_API_KEY="${EBAY_API_KEY}"
+            # Ensure docker compose doesn't warn about unset variables when parsing docker-compose.yml.
+            # We intentionally DO NOT pass GitHub secrets into this script (they can contain newlines and
+            # break heredocs, and diagnostics shouldn't need secret values).
+            export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-__set__}"
+            export SECRET_KEY="${SECRET_KEY:-__set__}"
+            export STEAM_API_KEY="${STEAM_API_KEY:-__set__}"
+            export EBAY_API_KEY="${EBAY_API_KEY:-__set__}"
+
+            # Try to run from a directory that has docker-compose.yml (CD places it in ~).
+            if [ -f "$HOME/docker-compose.yml" ]; then
+              cd "$HOME"
+            else
+              FOUND_COMPOSE="$(find "$HOME" -maxdepth 3 -name docker-compose.yml -print -quit 2>/dev/null)"
+              if [ -n "$FOUND_COMPOSE" ]; then
+                cd "$(dirname "$FOUND_COMPOSE")"
+              fi
+            fi
+
+            echo "=== Working Directory ==="
+            pwd || true
+            ls -la || true
 
             echo "=== Host Info ==="
             uname -a || true
@@ -67,11 +79,32 @@ jobs:
             echo "=== Backend Logs (tail: ${TAIL_LINES}) ==="
             docker compose logs backend --tail "${TAIL_LINES}" || true
 
+            echo "=== Backend Logs (docker logs fallback) ==="
+            docker ps -a --filter label=com.docker.compose.service=backend --format 'table {{.ID}}\t{{.Names}}\t{{.Status}}' || true
+            for CID in $(docker ps -aq --filter label=com.docker.compose.service=backend 2>/dev/null); do
+              echo "--- docker logs for $CID ---"
+              docker logs --tail "${TAIL_LINES}" "$CID" 2>&1 || true
+            done
+
             echo "=== DB Logs (tail: ${TAIL_LINES}) ==="
             docker compose logs db --tail "${TAIL_LINES}" || true
 
+            echo "=== DB Logs (docker logs fallback) ==="
+            docker ps -a --filter label=com.docker.compose.service=db --format 'table {{.ID}}\t{{.Names}}\t{{.Status}}' || true
+            for CID in $(docker ps -aq --filter label=com.docker.compose.service=db 2>/dev/null); do
+              echo "--- docker logs for $CID ---"
+              docker logs --tail "${TAIL_LINES}" "$CID" 2>&1 || true
+            done
+
             echo "=== Frontend Logs (tail: ${TAIL_LINES}) ==="
             docker compose logs frontend --tail "${TAIL_LINES}" || true
+
+            echo "=== Frontend Logs (docker logs fallback) ==="
+            docker ps -a --filter label=com.docker.compose.service=frontend --format 'table {{.ID}}\t{{.Names}}\t{{.Status}}' || true
+            for CID in $(docker ps -aq --filter label=com.docker.compose.service=frontend 2>/dev/null); do
+              echo "--- docker logs for $CID ---"
+              docker logs --tail "${TAIL_LINES}" "$CID" 2>&1 || true
+            done
 
             echo "=== Backend Container Environment Presence (no secret values) ==="
             docker compose exec -T backend python -c "import os; keys=['DATABASE_URL','STEAM_API_KEY','EBAY_API_KEY','SECRET_KEY']; [print(f'{k} set: {bool(os.getenv(k))}') for k in keys]" || true
