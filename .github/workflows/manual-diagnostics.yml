@@ -1,0 +1,96 @@
+name: Manual VM Diagnostics
+
+on:
+  workflow_dispatch:
+    inputs:
+      tail_lines:
+        description: "How many log lines to show per service"
+        required: false
+        default: "300"
+      include_external_checks:
+        description: "Also run outbound connectivity checks (Steam + CheapShark)"
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  diagnostics:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.ORACLE_VM_IP }} >> ~/.ssh/known_hosts
+
+      - name: Run diagnostics on VM
+        env:
+          TAIL_LINES: ${{ inputs.tail_lines }}
+          INCLUDE_EXTERNAL_CHECKS: ${{ inputs.include_external_checks }}
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }} << EOF
+            set -e
+
+            TAIL_LINES="${TAIL_LINES:-300}"
+            INCLUDE_EXTERNAL_CHECKS="${INCLUDE_EXTERNAL_CHECKS:-true}"
+
+            echo "=== Host Info ==="
+            uname -a || true
+            date || true
+            uptime || true
+            df -h || true
+            free -m || true
+
+            echo "=== Docker Info ==="
+            docker version || true
+            docker compose version || true
+
+            echo "=== Compose Status ==="
+            docker compose ps -a || true
+
+            echo "=== Recent Images (gamer-nexus) ==="
+            docker images | grep -E 'gamer-nexus|REPOSITORY' || true
+
+            echo "=== Backend Logs (tail: ${TAIL_LINES}) ==="
+            docker compose logs backend --tail "${TAIL_LINES}" || true
+
+            echo "=== DB Logs (tail: ${TAIL_LINES}) ==="
+            docker compose logs db --tail "${TAIL_LINES}" || true
+
+            echo "=== Frontend Logs (tail: ${TAIL_LINES}) ==="
+            docker compose logs frontend --tail "${TAIL_LINES}" || true
+
+            echo "=== Backend Container Environment Presence (no secret values) ==="
+            docker compose exec -T backend sh -lc '
+              python - <<PY
+import os
+keys = ["DATABASE_URL", "STEAM_API_KEY", "EBAY_API_KEY", "SECRET_KEY"]
+for k in keys:
+    print(f"{k} set: {bool(os.getenv(k))}")
+PY
+            ' || true
+
+            if [ "${INCLUDE_EXTERNAL_CHECKS}" = "true" ]; then
+              echo "=== External Connectivity Checks ==="
+              if command -v curl >/dev/null 2>&1; then
+                echo "Steam store (HEAD):"
+                curl -I -fsS --max-time 10 https://store.steampowered.com/ | head -n 5 || true
+
+                echo "Steam Web API (sample call):"
+                curl -fsS --max-time 10 "https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/?appid=440&count=1&maxlength=1" | head -c 300 || true
+                echo
+
+                echo "CheapShark API (sample deals):"
+                curl -fsS --max-time 10 "https://www.cheapshark.com/api/1.0/deals?pageSize=1" | head -c 300 || true
+                echo
+              else
+                echo "curl not installed on VM; skipping external checks"
+              fi
+            else
+              echo "External checks disabled."
+            fi
+
+            echo "=== Done ==="
+          EOF
