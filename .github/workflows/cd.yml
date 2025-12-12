@@ -36,11 +36,15 @@ jobs:
       env:
         DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         SECRET_KEY: ${{ secrets.SECRET_KEY }}
+        STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
+        EBAY_API_KEY: ${{ secrets.EBAY_API_KEY }}
       run: |
         ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }} << EOF
           # Export secrets so docker compose can use them
           export POSTGRES_PASSWORD=$DB_PASSWORD
           export SECRET_KEY=$SECRET_KEY
+          export STEAM_API_KEY=$STEAM_API_KEY
+          export EBAY_API_KEY=$EBAY_API_KEY
 
           # Rename prod compose file to standard name for convenience
           mv docker-compose.prod.yml docker-compose.yml

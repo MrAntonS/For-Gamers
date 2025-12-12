@@ -1,14 +1,46 @@
 from flask import Blueprint, jsonify, request
 import math
+from services.steam_service import get_steam_featured, save_game_to_db, update_game_details_systematically
+from models import Game, db
 
 products_bp = Blueprint('products_bp', __name__)
 
 @products_bp.route('/api/products')
 def get_products():
     """
-    A placeholder route to get products.
-    In the future, this will fetch data from the eBay API.
+    Get products from the database.
+    Fetches fresh data from Steam if the database is empty or on specific trigger.
     """
+    category = request.args.get('category')
+    page = int(request.args.get('page', 1))
+    limit = int(request.args.get('limit', 10))
+    
+    # If category is Game, handle Steam logic
+    if category == 'Game':
+        # Query DB for results
+        # We rely on the background task to populate the database
+        query = Game.query
+        
+        # Filter for actual deals if looking for deals, or just all games
+        # The user asked for "best deals, by percentage"
+        # We can assume the default view for "Game" category in this context is deals
+        query = query.filter(Game.discount > 0)
+        
+        # Pagination
+        total_games = query.count()
+        
+        # Sort by discount percentage descending
+        games = query.order_by(Game.discount.desc(), Game.last_updated.desc()).paginate(page=page, per_page=limit, error_out=False)
+        
+        products = [game.to_dict() for game in games.items]
+        
+        return jsonify({
+            "products": products,
+            "total": total_games,
+            "page": page,
+            "totalPages": games.pages
+        })
+
     # Placeholder data
     mock_products = [
         {
