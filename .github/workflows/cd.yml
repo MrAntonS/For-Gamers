@@ -49,51 +49,106 @@ jobs:
           # Rename prod compose file to standard name for convenience
           mv docker-compose.prod.yml docker-compose.yml
 
-          # Stop old containers
-          echo "Stopping old containers..."
-          docker compose down
+          # Preserve currently deployed images for rollback
+          echo "Tagging current images as :previous (if present)..."
+          if docker image inspect gamer-nexus-frontend:latest >/dev/null 2>&1; then
+            OLD_FRONTEND_ID="$(docker image inspect -f '{{.Id}}' gamer-nexus-frontend:latest)"
+            docker tag gamer-nexus-frontend:latest gamer-nexus-frontend:previous
+          else
+            OLD_FRONTEND_ID=""
+          fi
 
-          # Remove old images to ensure we use the new ones
-          echo "Removing old images..."
-          docker rmi gamer-nexus-frontend:latest gamer-nexus-backend:latest || true
+          if docker image inspect gamer-nexus-backend:latest >/dev/null 2>&1; then
+            OLD_BACKEND_ID="$(docker image inspect -f '{{.Id}}' gamer-nexus-backend:latest)"
+            docker tag gamer-nexus-backend:latest gamer-nexus-backend:previous
+          else
+            OLD_BACKEND_ID=""
+          fi
 
-          # Load images from .tar files
+          # Load new images from .tar files (these are tagged :latest)
           echo "Loading frontend image..."
           docker load < frontend.tar
           echo "Loading backend image..."
           docker load < backend.tar
+
+          NEW_FRONTEND_ID="$(docker image inspect -f '{{.Id}}' gamer-nexus-frontend:latest)"
+          NEW_BACKEND_ID="$(docker image inspect -f '{{.Id}}' gamer-nexus-backend:latest)"
           
           # List loaded images
           echo "Available images:"
           docker images
           
           echo "Starting new containers..."
-          docker compose up -d
+          docker compose up -d --force-recreate
           
           # Check container status
           echo "Container status:"
           docker compose ps
           
-          # Clean up the .tar files and dangling images
-          rm frontend.tar backend.tar
-          docker image prune -f
+          # Clean up the .tar files (keep images for potential rollback)
+          rm -f frontend.tar backend.tar
 
           # Post-deployment health check
-          echo "Waiting 60 seconds for services to stabilize..."
-          sleep 60
+          echo "Waiting 45 seconds for services to stabilize..."
+          sleep 45
 
           echo "Checking service status..."
           docker compose ps -a
 
+          HEALTH_OK=1
+
           # Verify all services are running
           for SERVICE in backend frontend db; do
-            if [ -z "\$(docker compose ps -q \$SERVICE --filter "status=running")" ]; then
+            if [ -z "\$(docker compose ps -q \$SERVICE --filter status=running)" ]; then
               echo "CRITICAL: \$SERVICE is not running!"
               echo "Logs for \$SERVICE:"
-              docker compose logs \$SERVICE --tail=100
-              exit 1
+              docker compose logs \$SERVICE --tail=200
+              HEALTH_OK=0
             fi
           done
 
-          echo "Deployment successful! All services are running."
+          # Basic HTTP checks (backend + frontend)
+          if command -v curl >/dev/null 2>&1; then
+            echo "Checking backend HTTP..."
+            if ! curl -fsS --max-time 10 http://localhost:5000/api/minmax/games >/dev/null; then
+              echo "CRITICAL: backend HTTP check failed"
+              docker compose logs backend --tail=200
+              HEALTH_OK=0
+            fi
+
+            echo "Checking frontend HTTP..."
+            if ! curl -fsS --max-time 10 http://localhost/ >/dev/null; then
+              echo "CRITICAL: frontend HTTP check failed"
+              docker compose logs frontend --tail=200
+              HEALTH_OK=0
+            fi
+          else
+            echo "curl not found; skipping HTTP checks"
+          fi
+
+          if [ "\$HEALTH_OK" -ne 1 ]; then
+            echo "Deployment failed health checks. Rolling back..."
+
+            docker compose down
+
+            if docker image inspect gamer-nexus-frontend:previous >/dev/null 2>&1 && docker image inspect gamer-nexus-backend:previous >/dev/null 2>&1; then
+              docker tag gamer-nexus-frontend:previous gamer-nexus-frontend:latest
+              docker tag gamer-nexus-backend:previous gamer-nexus-backend:latest
+
+              echo "Restarting services on previous images..."
+              docker compose up -d --force-recreate
+            else
+              echo "No previous images available to roll back to."
+            fi
+
+            echo "Removing failed new images (if safe)..."
+            # Remove by image ID to avoid deleting the rollback tags.
+            if [ -n "\$NEW_FRONTEND_ID" ]; then docker rmi -f "\$NEW_FRONTEND_ID" || true; fi
+            if [ -n "\$NEW_BACKEND_ID" ]; then docker rmi -f "\$NEW_BACKEND_ID" || true; fi
+            docker image prune -f || true
+
+            exit 1
+          fi
+
+          echo "Deployment successful!"
         EOF
