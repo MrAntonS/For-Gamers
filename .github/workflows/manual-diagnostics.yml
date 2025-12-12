@@ -63,14 +63,7 @@ jobs:
             docker compose logs frontend --tail "${TAIL_LINES}" || true
 
             echo "=== Backend Container Environment Presence (no secret values) ==="
-            docker compose exec -T backend sh -lc '
-              python - <<PY
-import os
-keys = ["DATABASE_URL", "STEAM_API_KEY", "EBAY_API_KEY", "SECRET_KEY"]
-for k in keys:
-    print(f"{k} set: {bool(os.getenv(k))}")
-PY
-            ' || true
+            docker compose exec -T backend python -c "import os; keys=['DATABASE_URL','STEAM_API_KEY','EBAY_API_KEY','SECRET_KEY']; [print(f'{k} set: {bool(os.getenv(k))}') for k in keys]" || true
 
             if [ "${INCLUDE_EXTERNAL_CHECKS}" = "true" ]; then
               echo "=== External Connectivity Checks ==="
