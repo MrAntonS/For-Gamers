@@ -1,6 +1,11 @@
 from flask import Blueprint, jsonify, request
 import math
-from services.steam_service import get_steam_featured, save_game_to_db, update_game_details_systematically
+from services.steam_service import (
+    get_steam_featured,
+    save_game_to_db,
+    update_game_details_systematically,
+    fetch_cheapshark_deals,
+)
 from models import Game, db
 
 products_bp = Blueprint('products_bp', __name__)
@@ -17,14 +22,41 @@ def get_products():
     
     # If category is Game, handle Steam logic
     if category == 'Game':
+        # NOTE:
+        # In Docker, the backend is started via Gunicorn (see backend/Dockerfile).
+        # That means the background thread in app.py (under __main__) does NOT run,
+        # so the DB can stay empty unless we populate it lazily here.
+        try:
+            existing_games = Game.query.count()
+        except Exception:
+            existing_games = 0
+
+        if existing_games == 0:
+            # Populate a small batch synchronously so the UI has results.
+            # Keep this modest to avoid long request times.
+            try:
+                fetch_cheapshark_deals(pages=3)
+            except Exception as e:
+                print(f"Error during on-demand CheapShark fetch: {e}")
+
+            try:
+                update_game_details_systematically(limit=10)
+            except Exception as e:
+                print(f"Error during on-demand Steam details update: {e}")
+
         # Query DB for results
-        # We rely on the background task to populate the database
         query = Game.query
         
-        # Filter for actual deals if looking for deals, or just all games
-        # The user asked for "best deals, by percentage"
-        # We can assume the default view for "Game" category in this context is deals
+        # Filter for actual deals (best deals, by percentage)
         query = query.filter(Game.discount > 0)
+
+        # If we still have no deals, try one more lightweight fetch.
+        # This covers cases where the DB has games but none have discounts yet.
+        if query.count() == 0:
+            try:
+                fetch_cheapshark_deals(pages=1)
+            except Exception as e:
+                print(f"Error during fallback CheapShark fetch: {e}")
         
         # Pagination
         total_games = query.count()
