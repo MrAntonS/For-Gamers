@@ -29,12 +29,23 @@ jobs:
         env:
           TAIL_LINES: ${{ inputs.tail_lines }}
           INCLUDE_EXTERNAL_CHECKS: ${{ inputs.include_external_checks }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
+          EBAY_API_KEY: ${{ secrets.EBAY_API_KEY }}
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }} << EOF
             set -e
 
             TAIL_LINES="${TAIL_LINES:-300}"
             INCLUDE_EXTERNAL_CHECKS="${INCLUDE_EXTERNAL_CHECKS:-true}"
+
+            # Make sure docker compose can substitute variables in docker-compose.yml.
+            # GitHub secrets exist on the runner, not on the VM, so we pass them through this SSH session.
+            export POSTGRES_PASSWORD="${DB_PASSWORD}"
+            export SECRET_KEY="${SECRET_KEY}"
+            export STEAM_API_KEY="${STEAM_API_KEY}"
+            export EBAY_API_KEY="${EBAY_API_KEY}"
 
             echo "=== Host Info ==="
             uname -a || true
