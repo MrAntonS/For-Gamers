@@ -2,6 +2,8 @@ import os
 import requests
 
 # In a real app, use a more secure way to handle API keys
+# Note: For eBay, this should be a valid OAuth Application Access Token.
+# You can generate one using your Client ID and Client Secret.
 EBAY_API_KEY = os.environ.get("EBAY_API_KEY")
 
 def search_ebay_products(query):
