@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+
+# Local databases
+backend/instance/*.db
+backend/instance/*.sqlite
+backend/instance/*.sqlite3
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment
+.env
+.env.*
+
+# Node
+node_modules/
+dist/
+
+# OS
+.DS_Store
+Thumbs.db

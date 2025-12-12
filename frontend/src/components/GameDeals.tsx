@@ -47,14 +47,14 @@ const GameDeals = () => {
     const fetchGames = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`${API_BASE_URL}/api/products?category=Game&page=${currentPage}&limit=18`);
+        const response = await fetch(`${API_BASE_URL}/api/products?category=Game&page=${currentPage}&limit=10`);
         if (!response.ok) {
           throw new Error('Failed to fetch game deals');
         }
         const data = await response.json();
         const mappedGames = data.products.map((p: any) => ({
           id: p.id,
-          title: p.name,
+          title: p.title || p.name,
           price: p.price,
           originalPrice: p.originalPrice,
           category: p.category,
@@ -63,7 +63,7 @@ const GameDeals = () => {
           description: p.description
         }));
         setGames(mappedGames);
-        setTotalPages(data.total_pages || 1);
+        setTotalPages(data.totalPages || 1);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
