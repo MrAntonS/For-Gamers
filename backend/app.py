@@ -1,5 +1,8 @@
 import os
 import secrets
+import sys
+import logging
+from logging.handlers import RotatingFileHandler
 from flask import Flask
 from flask_cors import CORS
 from models import db
@@ -10,8 +13,79 @@ try:
 except ImportError:
     pass
 
+
+class _StreamToLogger:
+    def __init__(self, logger: logging.Logger, level: int):
+        self._logger = logger
+        self._level = level
+
+    def write(self, message):
+        if not message:
+            return
+        message = str(message).rstrip()
+        if message:
+            self._logger.log(self._level, message)
+
+    def flush(self):
+        return
+
+
+def _setup_logging(app: Flask) -> None:
+    log_dir = os.environ.get("LOG_DIR", "logs")
+    log_file = os.environ.get("LOG_FILE", os.path.join(log_dir, "app.log"))
+    max_bytes = int(os.environ.get("LOG_MAX_BYTES", str(5 * 1024 * 1024)))
+    backup_count = int(os.environ.get("LOG_BACKUP_COUNT", "5"))
+
+    os.makedirs(os.path.dirname(log_file) or log_dir, exist_ok=True)
+
+    level_name = os.environ.get("LOG_LEVEL", "INFO").upper()
+    level = getattr(logging, level_name, logging.INFO)
+
+    formatter = logging.Formatter(
+        fmt="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    file_handler = RotatingFileHandler(
+        log_file,
+        maxBytes=max_bytes,
+        backupCount=backup_count,
+        encoding="utf-8",
+    )
+    file_handler.setLevel(level)
+    file_handler.setFormatter(formatter)
+
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setLevel(level)
+    stream_handler.setFormatter(formatter)
+
+    root = logging.getLogger()
+    root.setLevel(level)
+    root.handlers = []
+    root.addHandler(file_handler)
+    root.addHandler(stream_handler)
+
+    # Ensure Flask's logger also goes to file
+    app.logger.handlers = []
+    app.logger.propagate = True
+
+    # If running under Gunicorn, attach handlers to its loggers too
+    for logger_name in ("gunicorn.error", "gunicorn.access"):
+        g_logger = logging.getLogger(logger_name)
+        g_logger.setLevel(level)
+        g_logger.handlers = []
+        g_logger.propagate = True
+
+    # Redirect all print()/stdout/stderr into logging
+    redirect = os.environ.get("REDIRECT_STDOUT_TO_LOG", "1").lower() in ("1", "true", "yes", "on")
+    if redirect:
+        sys.stdout = _StreamToLogger(logging.getLogger("stdout"), logging.INFO)
+        sys.stderr = _StreamToLogger(logging.getLogger("stderr"), logging.ERROR)
+
 def create_app():
     app = Flask(__name__)
+
+    _setup_logging(app)
     
     # Configure Database
     app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///local.db')

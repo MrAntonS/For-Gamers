@@ -12,11 +12,15 @@ services:
     build: ./backend
     ports:
       - "5000:5000"
+    volumes:
+      - ./backend/logs:/app/logs
     environment:
       - FLASK_ENV=development
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/gamernexus
       - STEAM_API_KEY=${STEAM_API_KEY}
       - EBAY_API_KEY=${EBAY_API_KEY}
+      - LOG_DIR=/app/logs
+      - LOG_FILE=/app/logs/app.log
     depends_on:
       - db
 

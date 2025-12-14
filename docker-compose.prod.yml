@@ -10,12 +10,17 @@ services:
     image: gamer-nexus-backend:latest
     ports:
       - "5000:5000"
+    volumes:
+      - ./logs:/app/logs
     environment:
       - FLASK_ENV=production
       - SECRET_KEY=${SECRET_KEY}
       - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/gamernexus
       - STEAM_API_KEY=${STEAM_API_KEY}
       - EBAY_API_KEY=${EBAY_API_KEY}
+      - LOG_DIR=/app/logs
+      - LOG_FILE=/app/logs/app.log
+      - REDIRECT_STDOUT_TO_LOG=1
     depends_on:
       - db
 

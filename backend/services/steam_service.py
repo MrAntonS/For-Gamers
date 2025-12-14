@@ -445,6 +445,11 @@ def fetch_cheapshark_deals(pages=5):
         try:
             print(f"Fetching CheapShark page {page}...")
             response = requests.get(base_url, params=params)
+
+            # Surface unexpected responses (helps debug silent stops)
+            if response.status_code not in (200, 429):
+                body_preview = (response.text or "")[:500]
+                print(f"CheapShark unexpected status {response.status_code} on page {page}. Body (first 500 chars): {body_preview}")
             
             # Handle rate limiting
             if response.status_code == 429:
@@ -455,6 +460,7 @@ def fetch_cheapshark_deals(pages=5):
             deals = response.json()
             
             if not deals:
+                print(f"CheapShark returned 0 deals on page {page}. Stopping fetch.")
                 break
             
             page_updates = 0
