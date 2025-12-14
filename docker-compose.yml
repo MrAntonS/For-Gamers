@@ -16,7 +16,10 @@ services:
       - ./backend/logs:/app/logs
     environment:
       - FLASK_ENV=development
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/gamernexus
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_HOST=db
+      - POSTGRES_DB=gamernexus
       - STEAM_API_KEY=${STEAM_API_KEY}
       - EBAY_API_KEY=${EBAY_API_KEY}
       - LOG_DIR=/app/logs

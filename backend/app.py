@@ -88,7 +88,22 @@ def create_app():
     _setup_logging(app)
     
     # Configure Database
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///local.db')
+    database_url = os.environ.get('DATABASE_URL')
+    if not database_url:
+        # Fallback to constructing from components (safer for passwords with special chars)
+        db_user = os.environ.get('POSTGRES_USER', 'postgres')
+        db_pass = os.environ.get('POSTGRES_PASSWORD', 'postgres')
+        db_host = os.environ.get('POSTGRES_HOST', 'db')
+        db_port = os.environ.get('POSTGRES_PORT', '5432')
+        db_name = os.environ.get('POSTGRES_DB', 'gamernexus')
+        
+        if db_pass:
+            import urllib.parse
+            db_pass = urllib.parse.quote_plus(db_pass)
+            
+        database_url = f"postgresql://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
+
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
     db.init_app(app)

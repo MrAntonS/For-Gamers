@@ -168,5 +168,18 @@ jobs:
             print("HTTP checks OK")
             PY
 
+            echo "Waiting 30s for container stabilization..."
+            sleep 30
+
+            echo "Verifying services are still healthy..."
+            STABLE_SERVICES="$(docker compose --env-file .env -f "$COMPOSE_FILE" ps --services --filter status=running || true)"
+            for svc in backend frontend db; do
+              if ! printf '%s\n' "$STABLE_SERVICES" | grep -qx "$svc"; then
+                echo "CRITICAL: $svc crashed after startup" >&2
+                docker compose --env-file .env -f "$COMPOSE_FILE" logs --tail=100 "$svc" || true
+                exit 1
+              fi
+            done
+
             echo "Deployment successful."
           EOF
