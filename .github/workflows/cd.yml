@@ -64,7 +64,7 @@ jobs:
           ssh-keyscan -H ${{ secrets.ORACLE_VM_IP }} >> ~/.ssh/known_hosts
 
       - name: Copy files to VM
-        run: scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa docker-compose.yml docker-compose.prod.yml frontend.tar backend.tar ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }}:~/
+        run: scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa docker-compose.yml docker-compose.prod.yml frontend.tar backend.tar scripts/healthcheck.sh ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }}:~/
 
       - name: Deploy on VM
         env:
@@ -119,73 +119,15 @@ jobs:
 
             echo "Compose status:"
             docker compose --env-file .env -f "$COMPOSE_FILE" ps
-
-            # Wait for db to be accepting connections and authenticated
-            echo "Waiting for db readiness..."
-            POSTGRES_PASSWORD="$(decode "$POSTGRES_PASSWORD_B64")"
-            for i in $(seq 1 30); do
-              # Check connectivity AND authentication using psql
-              if docker compose --env-file .env -f "$COMPOSE_FILE" exec -T \
-                  -e PGPASSWORD="$POSTGRES_PASSWORD" \
-                  db psql -U postgres -d gamernexus -c "SELECT 1" >/dev/null 2>&1; then
-                echo "db is ready and authenticated"
-                break
-              fi
-              
-              if [ "$i" -eq 30 ]; then
-                echo "CRITICAL: db did not become ready or authentication failed" >&2
-                docker compose --env-file .env -f "$COMPOSE_FILE" logs --tail=200 db || true
-                exit 1
-              fi
-              sleep 2
-            done
-            echo "DB check passed."
-
-            echo "Verifying services are running..."
-            RUNNING_SERVICES="$(docker compose --env-file .env -f "$COMPOSE_FILE" ps --services --filter status=running || true)"
-            for svc in backend frontend db; do
-              if ! printf '%s\n' "$RUNNING_SERVICES" | grep -qx "$svc"; then
-                echo "CRITICAL: $svc is not running" >&2
-                docker compose --env-file .env -f "$COMPOSE_FILE" ps -a || true
-                docker compose --env-file .env -f "$COMPOSE_FILE" logs --tail=200 "$svc" || true
-                exit 1
-              fi
-            done
-
-            echo "HTTP checks (from inside backend container)..."
-            docker compose --env-file .env -f "$COMPOSE_FILE" exec -T backend python - << 'PY'
-            import sys
-            import urllib.request
-
-
-            def check(url: str) -> None:
-                req = urllib.request.Request(url, headers={"User-Agent": "healthcheck"})
-                try:
-                    with urllib.request.urlopen(req, timeout=10) as resp:
-                        code = getattr(resp, "status", resp.getcode())
-                        if code < 200 or code >= 400:
-                            raise RuntimeError(f"HTTP {code}")
-                except Exception as e:
-                    raise RuntimeError(f"Healthcheck failed for {url}: {e}")
-
-
-            check("http://localhost:5000/api/minmax/games")
-            check("http://frontend/")
-            print("HTTP checks OK")
-            PY
-
-            echo "Waiting 30s for container stabilization..."
-            sleep 30
-
-            echo "Verifying services are still healthy..."
-            STABLE_SERVICES="$(docker compose --env-file .env -f "$COMPOSE_FILE" ps --services --filter status=running || true)"
-            for svc in backend frontend db; do
-              if ! printf '%s\n' "$STABLE_SERVICES" | grep -qx "$svc"; then
-                echo "CRITICAL: $svc crashed after startup" >&2
-                docker compose --env-file .env -f "$COMPOSE_FILE" logs --tail=100 "$svc" || true
-                exit 1
-              fi
-            done
-
-            echo "Deployment successful."
+            
+            chmod +x healthcheck.sh
+            echo "Deployment successful. Ready for health checks."
           EOF
+
+      - name: Run Health Checks
+        env:
+          DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
+            ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }} \
+            "DEPLOY_ENV='$DEPLOY_ENV' ./healthcheck.sh"
