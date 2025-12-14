@@ -3,6 +3,12 @@ name: CD
 on:
   push:
     branches: [ dev ]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref (branch/tag/SHA) to deploy
+        required: true
+        default: dev
 
 jobs:
   deploy:
@@ -10,6 +16,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.ref }}
 
     - name: Build frontend image
       run: docker build -t gamer-nexus-frontend:latest ./frontend
