@@ -27,6 +27,24 @@ jobs:
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
 
+      - name: Validate required secrets
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          ORACLE_VM_IP: ${{ secrets.ORACLE_VM_IP }}
+          ORACLE_VM_USER: ${{ secrets.ORACLE_VM_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
+          EBAY_API_KEY: ${{ secrets.EBAY_API_KEY }}
+        run: |
+          set -euo pipefail
+          for v in SSH_PRIVATE_KEY ORACLE_VM_IP ORACLE_VM_USER DB_PASSWORD SECRET_KEY STEAM_API_KEY EBAY_API_KEY; do
+            if [ -z "${!v}" ]; then
+              echo "Missing required secret: $v" >&2
+              exit 1
+            fi
+          done
+
       - name: Build frontend image
         run: docker build -t gamer-nexus-frontend:latest ./frontend
 
@@ -56,126 +74,103 @@ jobs:
           EBAY_API_KEY: ${{ secrets.EBAY_API_KEY }}
           DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }} << EOF
-            # Export secrets so docker compose can use them
-            export POSTGRES_PASSWORD=$DB_PASSWORD
-            export SECRET_KEY=$SECRET_KEY
-            export STEAM_API_KEY=$STEAM_API_KEY
-            export EBAY_API_KEY=$EBAY_API_KEY
+          set -euo pipefail
 
-            # Select compose file based on environment
-            echo "Deploy environment: $DEPLOY_ENV"
+          SECRET_KEY_B64="$(printf '%s' "$SECRET_KEY" | base64 -w0)"
+          POSTGRES_PASSWORD_B64="$(printf '%s' "$DB_PASSWORD" | base64 -w0)"
+          STEAM_API_KEY_B64="$(printf '%s' "$STEAM_API_KEY" | base64 -w0)"
+          EBAY_API_KEY_B64="$(printf '%s' "$EBAY_API_KEY" | base64 -w0)"
+
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
+            DEPLOY_ENV="$DEPLOY_ENV" \
+            SECRET_KEY_B64="$SECRET_KEY_B64" \
+            POSTGRES_PASSWORD_B64="$POSTGRES_PASSWORD_B64" \
+            STEAM_API_KEY_B64="$STEAM_API_KEY_B64" \
+            EBAY_API_KEY_B64="$EBAY_API_KEY_B64" \
+            ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }} 'bash -s' << 'EOF'
+            set -euo pipefail
+
+            decode() { printf '%s' "$1" | base64 -d; }
+
+            DEPLOY_ENV="${DEPLOY_ENV:-dev}"
+            COMPOSE_FILE="docker-compose.yml"
             if [ "$DEPLOY_ENV" = "prod" ]; then
-              mv docker-compose.prod.yml docker-compose.yml
-            else
-              # Ensure dev compose file is the active one
-              if [ -f docker-compose.yml ]; then
-                true
-              else
-                echo "ERROR: docker-compose.yml (dev) not found on VM"; exit 1
-              fi
+              COMPOSE_FILE="docker-compose.prod.yml"
             fi
 
-            # Preserve currently deployed images for rollback
-            echo "Tagging current images as :previous (if present)..."
-            if docker image inspect gamer-nexus-frontend:latest >/dev/null 2>&1; then
-              OLD_FRONTEND_ID="$(docker image inspect -f '{{.Id}}' gamer-nexus-frontend:latest)"
-              docker tag gamer-nexus-frontend:latest gamer-nexus-frontend:previous
-            else
-              OLD_FRONTEND_ID=""
-            fi
+            echo "Deploy environment: $DEPLOY_ENV"
+            echo "Using compose file: $COMPOSE_FILE"
 
-            if docker image inspect gamer-nexus-backend:latest >/dev/null 2>&1; then
-              OLD_BACKEND_ID="$(docker image inspect -f '{{.Id}}' gamer-nexus-backend:latest)"
-              docker tag gamer-nexus-backend:latest gamer-nexus-backend:previous
-            else
-              OLD_BACKEND_ID=""
-            fi
+            cd ~
+            test -f "$COMPOSE_FILE" || { echo "Missing compose file: $COMPOSE_FILE" >&2; exit 1; }
 
-            # Load new images from .tar files (these are tagged :latest)
-            echo "Loading frontend image..."
+            # Create/refresh a local env file for docker compose.
+            umask 077
+            {
+              printf 'SECRET_KEY=%s\n' "$(decode "$SECRET_KEY_B64")"
+              printf 'POSTGRES_PASSWORD=%s\n' "$(decode "$POSTGRES_PASSWORD_B64")"
+              printf 'STEAM_API_KEY=%s\n' "$(decode "$STEAM_API_KEY_B64")"
+              printf 'EBAY_API_KEY=%s\n' "$(decode "$EBAY_API_KEY_B64")"
+            } > .env
+
+            # Load images from tarballs
             docker load < frontend.tar
-            echo "Loading backend image..."
             docker load < backend.tar
-
-            NEW_FRONTEND_ID="$(docker image inspect -f '{{.Id}}' gamer-nexus-frontend:latest)"
-            NEW_BACKEND_ID="$(docker image inspect -f '{{.Id}}' gamer-nexus-backend:latest)"
-
-            # List loaded images
-            echo "Available images:"
-            docker images
-
-            echo "Starting new containers..."
-            docker compose up -d --force-recreate
-
-            # Check container status
-            echo "Container status:"
-            docker compose ps
-
-            # Clean up the .tar files (keep images for potential rollback)
             rm -f frontend.tar backend.tar
 
-            # Post-deployment health check
-            echo "Waiting 45 seconds for services to stabilize..."
-            sleep 45
+            echo "Starting services..."
+            docker compose --env-file .env -f "$COMPOSE_FILE" up -d --force-recreate --remove-orphans
 
-            echo "Checking service status..."
-            docker compose ps -a
+            echo "Compose status:"
+            docker compose --env-file .env -f "$COMPOSE_FILE" ps
 
-            HEALTH_OK=1
+            # Wait for db to be accepting connections (no need for host curl/wget)
+            echo "Waiting for db readiness..."
+            for i in $(seq 1 30); do
+              if docker compose --env-file .env -f "$COMPOSE_FILE" exec -T db pg_isready -U postgres -d gamernexus >/dev/null 2>&1; then
+                echo "db is ready"
+                break
+              fi
+              if [ "$i" -eq 30 ]; then
+                echo "CRITICAL: db did not become ready" >&2
+                docker compose --env-file .env -f "$COMPOSE_FILE" logs --tail=200 db || true
+                exit 1
+              fi
+              sleep 2
+            done
 
-            # Verify all services are running
-            for SERVICE in backend frontend db; do
-              if [ -z "$(docker compose ps -q $SERVICE --filter status=running)" ]; then
-                echo "CRITICAL: $SERVICE is not running!"
-                echo "Logs for $SERVICE:"
-                docker compose logs $SERVICE --tail=200
-                HEALTH_OK=0
+            echo "Verifying services are running..."
+            RUNNING_SERVICES="$(docker compose --env-file .env -f "$COMPOSE_FILE" ps --services --filter status=running || true)"
+            for svc in backend frontend db; do
+              if ! printf '%s\n' "$RUNNING_SERVICES" | grep -qx "$svc"; then
+                echo "CRITICAL: $svc is not running" >&2
+                docker compose --env-file .env -f "$COMPOSE_FILE" ps -a || true
+                docker compose --env-file .env -f "$COMPOSE_FILE" logs --tail=200 "$svc" || true
+                exit 1
               fi
             done
 
-            # Basic HTTP checks (backend + frontend)
-            if command -v curl >/dev/null 2>&1; then
-              echo "Checking backend HTTP..."
-              if ! curl -fsS --max-time 10 http://localhost:5000/api/minmax/games >/dev/null; then
-                echo "CRITICAL: backend HTTP check failed"
-                docker compose logs backend --tail=200
-                HEALTH_OK=0
-              fi
+            echo "HTTP checks (from inside backend container)..."
+            docker compose --env-file .env -f "$COMPOSE_FILE" exec -T backend python - << 'PY'
+            import sys
+            import urllib.request
 
-              echo "Checking frontend HTTP..."
-              if ! curl -fsS --max-time 10 http://localhost/ >/dev/null; then
-                echo "CRITICAL: frontend HTTP check failed"
-                docker compose logs frontend --tail=200
-                HEALTH_OK=0
-              fi
-            else
-              echo "curl not found; skipping HTTP checks"
-            fi
 
-            if [ "$HEALTH_OK" -ne 1 ]; then
-              echo "Deployment failed health checks. Rolling back..."
+            def check(url: str) -> None:
+                req = urllib.request.Request(url, headers={"User-Agent": "healthcheck"})
+                try:
+                    with urllib.request.urlopen(req, timeout=10) as resp:
+                        code = getattr(resp, "status", resp.getcode())
+                        if code < 200 or code >= 400:
+                            raise RuntimeError(f"HTTP {code}")
+                except Exception as e:
+                    raise RuntimeError(f"Healthcheck failed for {url}: {e}")
 
-              docker compose down
 
-              if docker image inspect gamer-nexus-frontend:previous >/dev/null 2>&1 && docker image inspect gamer-nexus-backend:previous >/dev/null 2>&1; then
-                docker tag gamer-nexus-frontend:previous gamer-nexus-frontend:latest
-                docker tag gamer-nexus-backend:previous gamer-nexus-backend:latest
+            check("http://localhost:5000/api/minmax/games")
+            check("http://frontend/")
+            print("HTTP checks OK")
+            PY
 
-                echo "Restarting services on previous images..."
-                docker compose up -d --force-recreate
-              else
-                echo "No previous images available to roll back to."
-              fi
-
-              echo "Removing failed new images (if safe)..."
-              # Remove by image ID to avoid deleting the rollback tags.
-              if [ -n "$NEW_FRONTEND_ID" ]; then docker rmi -f "$NEW_FRONTEND_ID" || true; fi
-              if [ -n "$NEW_BACKEND_ID" ]; then docker rmi -f "$NEW_BACKEND_ID" || true; fi
-              docker image prune -f || true
-
-              exit 1
-            fi
-
-            echo "Deployment successful!"
-          EOF
+            echo "Deployment successful."
+            EOF
