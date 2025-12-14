@@ -14,149 +14,149 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        ref: ${{ inputs.ref }}
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
 
-    - name: Build frontend image
-      run: docker build -t gamer-nexus-frontend:latest ./frontend
+      - name: Build frontend image
+        run: docker build -t gamer-nexus-frontend:latest ./frontend
 
-    - name: Build backend image
-      run: docker build -t gamer-nexus-backend:latest ./backend
+      - name: Build backend image
+        run: docker build -t gamer-nexus-backend:latest ./backend
 
-    - name: Save Docker images to .tar files
-      run: |
-        docker save -o frontend.tar gamer-nexus-frontend:latest
-        docker save -o backend.tar gamer-nexus-backend:latest
+      - name: Save Docker images to .tar files
+        run: |
+          docker save -o frontend.tar gamer-nexus-frontend:latest
+          docker save -o backend.tar gamer-nexus-backend:latest
 
-    - name: Set up SSH key
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -H ${{ secrets.ORACLE_VM_IP }} >> ~/.ssh/known_hosts
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.ORACLE_VM_IP }} >> ~/.ssh/known_hosts
 
-    - name: Copy files to VM
-      run: scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa docker-compose.prod.yml frontend.tar backend.tar ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }}:~/
+      - name: Copy files to VM
+        run: scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa docker-compose.prod.yml frontend.tar backend.tar ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }}:~/
 
-    - name: Deploy on VM
-      env:
-        DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-        SECRET_KEY: ${{ secrets.SECRET_KEY }}
-        STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
-        EBAY_API_KEY: ${{ secrets.EBAY_API_KEY }}
-      run: |
-        ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }} << EOF
-          # Export secrets so docker compose can use them
-          export POSTGRES_PASSWORD=$DB_PASSWORD
-          export SECRET_KEY=$SECRET_KEY
-          export STEAM_API_KEY=$STEAM_API_KEY
-          export EBAY_API_KEY=$EBAY_API_KEY
+      - name: Deploy on VM
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
+          EBAY_API_KEY: ${{ secrets.EBAY_API_KEY }}
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }} << EOF
+            # Export secrets so docker compose can use them
+            export POSTGRES_PASSWORD=$DB_PASSWORD
+            export SECRET_KEY=$SECRET_KEY
+            export STEAM_API_KEY=$STEAM_API_KEY
+            export EBAY_API_KEY=$EBAY_API_KEY
 
-          # Rename prod compose file to standard name for convenience
-          mv docker-compose.prod.yml docker-compose.yml
+            # Rename prod compose file to standard name for convenience
+            mv docker-compose.prod.yml docker-compose.yml
 
-          # Preserve currently deployed images for rollback
-          echo "Tagging current images as :previous (if present)..."
-          if docker image inspect gamer-nexus-frontend:latest >/dev/null 2>&1; then
-            OLD_FRONTEND_ID="$(docker image inspect -f '{{.Id}}' gamer-nexus-frontend:latest)"
-            docker tag gamer-nexus-frontend:latest gamer-nexus-frontend:previous
-          else
-            OLD_FRONTEND_ID=""
-          fi
-
-          if docker image inspect gamer-nexus-backend:latest >/dev/null 2>&1; then
-            OLD_BACKEND_ID="$(docker image inspect -f '{{.Id}}' gamer-nexus-backend:latest)"
-            docker tag gamer-nexus-backend:latest gamer-nexus-backend:previous
-          else
-            OLD_BACKEND_ID=""
-          fi
-
-          # Load new images from .tar files (these are tagged :latest)
-          echo "Loading frontend image..."
-          docker load < frontend.tar
-          echo "Loading backend image..."
-          docker load < backend.tar
-
-          NEW_FRONTEND_ID="$(docker image inspect -f '{{.Id}}' gamer-nexus-frontend:latest)"
-          NEW_BACKEND_ID="$(docker image inspect -f '{{.Id}}' gamer-nexus-backend:latest)"
-          
-          # List loaded images
-          echo "Available images:"
-          docker images
-          
-          echo "Starting new containers..."
-          docker compose up -d --force-recreate
-          
-          # Check container status
-          echo "Container status:"
-          docker compose ps
-          
-          # Clean up the .tar files (keep images for potential rollback)
-          rm -f frontend.tar backend.tar
-
-          # Post-deployment health check
-          echo "Waiting 45 seconds for services to stabilize..."
-          sleep 45
-
-          echo "Checking service status..."
-          docker compose ps -a
-
-          HEALTH_OK=1
-
-          # Verify all services are running
-          for SERVICE in backend frontend db; do
-            if [ -z "\$(docker compose ps -q \$SERVICE --filter status=running)" ]; then
-              echo "CRITICAL: \$SERVICE is not running!"
-              echo "Logs for \$SERVICE:"
-              docker compose logs \$SERVICE --tail=200
-              HEALTH_OK=0
-            fi
-          done
-
-          # Basic HTTP checks (backend + frontend)
-          if command -v curl >/dev/null 2>&1; then
-            echo "Checking backend HTTP..."
-            if ! curl -fsS --max-time 10 http://localhost:5000/api/minmax/games >/dev/null; then
-              echo "CRITICAL: backend HTTP check failed"
-              docker compose logs backend --tail=200
-              HEALTH_OK=0
-            fi
-
-            echo "Checking frontend HTTP..."
-            if ! curl -fsS --max-time 10 http://localhost/ >/dev/null; then
-              echo "CRITICAL: frontend HTTP check failed"
-              docker compose logs frontend --tail=200
-              HEALTH_OK=0
-            fi
-          else
-            echo "curl not found; skipping HTTP checks"
-          fi
-
-          if [ "\$HEALTH_OK" -ne 1 ]; then
-            echo "Deployment failed health checks. Rolling back..."
-
-            docker compose down
-
-            if docker image inspect gamer-nexus-frontend:previous >/dev/null 2>&1 && docker image inspect gamer-nexus-backend:previous >/dev/null 2>&1; then
-              docker tag gamer-nexus-frontend:previous gamer-nexus-frontend:latest
-              docker tag gamer-nexus-backend:previous gamer-nexus-backend:latest
-
-              echo "Restarting services on previous images..."
-              docker compose up -d --force-recreate
+            # Preserve currently deployed images for rollback
+            echo "Tagging current images as :previous (if present)..."
+            if docker image inspect gamer-nexus-frontend:latest >/dev/null 2>&1; then
+              OLD_FRONTEND_ID="$(docker image inspect -f '{{.Id}}' gamer-nexus-frontend:latest)"
+              docker tag gamer-nexus-frontend:latest gamer-nexus-frontend:previous
             else
-              echo "No previous images available to roll back to."
+              OLD_FRONTEND_ID=""
             fi
 
-            echo "Removing failed new images (if safe)..."
-            # Remove by image ID to avoid deleting the rollback tags.
-            if [ -n "\$NEW_FRONTEND_ID" ]; then docker rmi -f "\$NEW_FRONTEND_ID" || true; fi
-            if [ -n "\$NEW_BACKEND_ID" ]; then docker rmi -f "\$NEW_BACKEND_ID" || true; fi
-            docker image prune -f || true
+            if docker image inspect gamer-nexus-backend:latest >/dev/null 2>&1; then
+              OLD_BACKEND_ID="$(docker image inspect -f '{{.Id}}' gamer-nexus-backend:latest)"
+              docker tag gamer-nexus-backend:latest gamer-nexus-backend:previous
+            else
+              OLD_BACKEND_ID=""
+            fi
 
-            exit 1
-          fi
+            # Load new images from .tar files (these are tagged :latest)
+            echo "Loading frontend image..."
+            docker load < frontend.tar
+            echo "Loading backend image..."
+            docker load < backend.tar
 
-          echo "Deployment successful!"
-        EOF
+            NEW_FRONTEND_ID="$(docker image inspect -f '{{.Id}}' gamer-nexus-frontend:latest)"
+            NEW_BACKEND_ID="$(docker image inspect -f '{{.Id}}' gamer-nexus-backend:latest)"
+
+            # List loaded images
+            echo "Available images:"
+            docker images
+
+            echo "Starting new containers..."
+            docker compose up -d --force-recreate
+
+            # Check container status
+            echo "Container status:"
+            docker compose ps
+
+            # Clean up the .tar files (keep images for potential rollback)
+            rm -f frontend.tar backend.tar
+
+            # Post-deployment health check
+            echo "Waiting 45 seconds for services to stabilize..."
+            sleep 45
+
+            echo "Checking service status..."
+            docker compose ps -a
+
+            HEALTH_OK=1
+
+            # Verify all services are running
+            for SERVICE in backend frontend db; do
+              if [ -z "$(docker compose ps -q $SERVICE --filter status=running)" ]; then
+                echo "CRITICAL: $SERVICE is not running!"
+                echo "Logs for $SERVICE:"
+                docker compose logs $SERVICE --tail=200
+                HEALTH_OK=0
+              fi
+            done
+
+            # Basic HTTP checks (backend + frontend)
+            if command -v curl >/dev/null 2>&1; then
+              echo "Checking backend HTTP..."
+              if ! curl -fsS --max-time 10 http://localhost:5000/api/minmax/games >/dev/null; then
+                echo "CRITICAL: backend HTTP check failed"
+                docker compose logs backend --tail=200
+                HEALTH_OK=0
+              fi
+
+              echo "Checking frontend HTTP..."
+              if ! curl -fsS --max-time 10 http://localhost/ >/dev/null; then
+                echo "CRITICAL: frontend HTTP check failed"
+                docker compose logs frontend --tail=200
+                HEALTH_OK=0
+              fi
+            else
+              echo "curl not found; skipping HTTP checks"
+            fi
+
+            if [ "$HEALTH_OK" -ne 1 ]; then
+              echo "Deployment failed health checks. Rolling back..."
+
+              docker compose down
+
+              if docker image inspect gamer-nexus-frontend:previous >/dev/null 2>&1 && docker image inspect gamer-nexus-backend:previous >/dev/null 2>&1; then
+                docker tag gamer-nexus-frontend:previous gamer-nexus-frontend:latest
+                docker tag gamer-nexus-backend:previous gamer-nexus-backend:latest
+
+                echo "Restarting services on previous images..."
+                docker compose up -d --force-recreate
+              else
+                echo "No previous images available to roll back to."
+              fi
+
+              echo "Removing failed new images (if safe)..."
+              # Remove by image ID to avoid deleting the rollback tags.
+              if [ -n "$NEW_FRONTEND_ID" ]; then docker rmi -f "$NEW_FRONTEND_ID" || true; fi
+              if [ -n "$NEW_BACKEND_ID" ]; then docker rmi -f "$NEW_BACKEND_ID" || true; fi
+              docker image prune -f || true
+
+              exit 1
+            fi
+
+            echo "Deployment successful!"
+          EOF
