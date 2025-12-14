@@ -23,24 +23,8 @@ def get_products():
     # If category is Game, handle Steam logic
     if category == 'Game':
         # NOTE:
-        # In Docker, the backend is started via Gunicorn.
-        # We trigger updates here to ensure the DB stays fresh.
-        
-        # 1. Fetch Deals
-        # We fetch up to 5 pages. 
-        # The service is smart: if Page 0 has no new deals, it stops immediately (1 request).
-        # If there are new deals, it continues up to 5 pages.
-        try:
-            fetch_cheapshark_deals(pages=20)
-        except Exception as e:
-            print(f"Error during on-demand CheapShark fetch: {e}")
-
-        # 2. Update Details
-        # Systematically update missing details (descriptions, requirements) for a few games.
-        try:
-            update_game_details_systematically(limit=5)
-        except Exception as e:
-            print(f"Error during on-demand Steam details update: {e}")
+        # Background thread in app.py handles data fetching.
+        # We just query the DB here.
 
         # Query DB for results
         query = Game.query

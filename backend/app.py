@@ -2,6 +2,7 @@ import os
 import secrets
 import sys
 import logging
+import threading
 from logging.handlers import RotatingFileHandler
 from flask import Flask
 from flask_cors import CORS
@@ -148,6 +149,20 @@ def create_app():
         app.register_blueprint(minmax.minmax_bp)
         app.register_blueprint(auth.auth_bp)
         app.register_blueprint(external.external_bp)
+# Start background thread
+    # Check if we are in the main process (not reloader) or if debug is off
+    if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+        # Check if thread is already running to avoid duplicates in same process
+        is_running = False
+        for t in threading.enumerate():
+            if t.name == "BackgroundSteamFetch":
+                is_running = True
+                break
+        
+        if not is_running:
+            bg_thread = threading.Thread(target=background_task, args=(app,), name="BackgroundSteamFetch")
+            bg_thread.daemon = True
+            bg_thread.start()
 
     return app
 
@@ -159,13 +174,16 @@ def background_task(app):
     from services.steam_service import fetch_cheapshark_deals, update_game_details_systematically
     
     with app.app_context():
+        first_run = True
         while True:
             print("Running background Steam fetch...")
             
+            # Fetch more pages on first run to populate DB
+            pages = 50 if first_run else 5
+            
             # 1. Fetch deals from CheapShark
             try:
-                # Fetching 20 pages (approx 1200 deals) to get more variety
-                fetch_cheapshark_deals(pages=20)
+                fetch_cheapshark_deals(pages=pages)
             except Exception as e:
                 print(f"Error in CheapShark fetch: {e}")
 
@@ -177,16 +195,12 @@ def background_task(app):
             except Exception as e:
                 print(f"Error in Steam details update: {e}")
             
+            first_run = False
             # Sleep for 10 minutes
             time.sleep(600)
 
 if __name__ == "__main__":
-    app = create_app()
-    
-    # Start background thread
-    import threading
-    thread = threading.Thread(target=background_task, args=(app,))
-    thread.daemon = True
+    app = create_appn = True
     thread.start()
     
     app.run(debug=True, host='0.0.0.0', port=5000)
