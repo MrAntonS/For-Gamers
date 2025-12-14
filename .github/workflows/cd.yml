@@ -120,20 +120,26 @@ jobs:
             echo "Compose status:"
             docker compose --env-file .env -f "$COMPOSE_FILE" ps
 
-            # Wait for db to be accepting connections (no need for host curl/wget)
+            # Wait for db to be accepting connections and authenticated
             echo "Waiting for db readiness..."
+            POSTGRES_PASSWORD="$(decode "$POSTGRES_PASSWORD_B64")"
             for i in $(seq 1 30); do
-              if docker compose --env-file .env -f "$COMPOSE_FILE" exec -T db pg_isready -U postgres -d gamernexus >/dev/null 2>&1; then
-                echo "db is ready"
+              # Check connectivity AND authentication using psql
+              if docker compose --env-file .env -f "$COMPOSE_FILE" exec -T \
+                  -e PGPASSWORD="$POSTGRES_PASSWORD" \
+                  db psql -U postgres -d gamernexus -c "SELECT 1" >/dev/null 2>&1; then
+                echo "db is ready and authenticated"
                 break
               fi
+              
               if [ "$i" -eq 30 ]; then
-                echo "CRITICAL: db did not become ready" >&2
+                echo "CRITICAL: db did not become ready or authentication failed" >&2
                 docker compose --env-file .env -f "$COMPOSE_FILE" logs --tail=200 db || true
                 exit 1
               fi
               sleep 2
             done
+            echo "DB check passed."
 
             echo "Verifying services are running..."
             RUNNING_SERVICES="$(docker compose --env-file .env -f "$COMPOSE_FILE" ps --services --filter status=running || true)"
