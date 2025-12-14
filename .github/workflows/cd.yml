@@ -82,12 +82,8 @@ jobs:
           EBAY_API_KEY_B64="$(printf '%s' "$EBAY_API_KEY" | base64 -w0)"
 
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
-            DEPLOY_ENV="$DEPLOY_ENV" \
-            SECRET_KEY_B64="$SECRET_KEY_B64" \
-            POSTGRES_PASSWORD_B64="$POSTGRES_PASSWORD_B64" \
-            STEAM_API_KEY_B64="$STEAM_API_KEY_B64" \
-            EBAY_API_KEY_B64="$EBAY_API_KEY_B64" \
-            ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }} 'bash -s' << 'EOF'
+            ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }} \
+            "DEPLOY_ENV='$DEPLOY_ENV' SECRET_KEY_B64='$SECRET_KEY_B64' POSTGRES_PASSWORD_B64='$POSTGRES_PASSWORD_B64' STEAM_API_KEY_B64='$STEAM_API_KEY_B64' EBAY_API_KEY_B64='$EBAY_API_KEY_B64' bash -s" << 'EOF'
             set -euo pipefail
 
             decode() { printf '%s' "$1" | base64 -d; }
@@ -173,4 +169,4 @@ jobs:
             PY
 
             echo "Deployment successful."
-            EOF
+          EOF
