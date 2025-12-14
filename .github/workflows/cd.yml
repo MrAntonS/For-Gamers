@@ -5,6 +5,14 @@ on:
     branches: [ dev ]
   workflow_dispatch:
     inputs:
+      environment:
+        description: Deployment environment
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+        default: dev
       ref:
         description: Git ref (branch/tag/SHA) to deploy
         required: true
@@ -17,7 +25,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
 
       - name: Build frontend image
         run: docker build -t gamer-nexus-frontend:latest ./frontend
@@ -38,7 +46,7 @@ jobs:
           ssh-keyscan -H ${{ secrets.ORACLE_VM_IP }} >> ~/.ssh/known_hosts
 
       - name: Copy files to VM
-        run: scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa docker-compose.prod.yml frontend.tar backend.tar ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }}:~/
+        run: scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa docker-compose.yml docker-compose.prod.yml frontend.tar backend.tar ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }}:~/
 
       - name: Deploy on VM
         env:
@@ -46,6 +54,7 @@ jobs:
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
           EBAY_API_KEY: ${{ secrets.EBAY_API_KEY }}
+          DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }} << EOF
             # Export secrets so docker compose can use them
@@ -54,8 +63,18 @@ jobs:
             export STEAM_API_KEY=$STEAM_API_KEY
             export EBAY_API_KEY=$EBAY_API_KEY
 
-            # Rename prod compose file to standard name for convenience
-            mv docker-compose.prod.yml docker-compose.yml
+            # Select compose file based on environment
+            echo "Deploy environment: $DEPLOY_ENV"
+            if [ "$DEPLOY_ENV" = "prod" ]; then
+              mv docker-compose.prod.yml docker-compose.yml
+            else
+              # Ensure dev compose file is the active one
+              if [ -f docker-compose.yml ]; then
+                true
+              else
+                echo "ERROR: docker-compose.yml (dev) not found on VM"; exit 1
+              fi
+            fi
 
             # Preserve currently deployed images for rollback
             echo "Tagging current images as :previous (if present)..."
