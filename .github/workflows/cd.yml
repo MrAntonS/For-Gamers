@@ -100,6 +100,26 @@ jobs:
             cd ~
             test -f "$COMPOSE_FILE" || { echo "Missing compose file: $COMPOSE_FILE" >&2; exit 1; }
 
+            # 1. Stop current containers
+            echo "Stopping current services..."
+            if [ -f .env ]; then
+                docker compose --env-file .env -f "$COMPOSE_FILE" down || true
+            else
+                docker compose -f "$COMPOSE_FILE" down || true
+            fi
+
+            # 2. Backup current images
+            echo "Backing up current images..."
+            for img in gamer-nexus-frontend gamer-nexus-backend; do
+                if docker image inspect $img:latest >/dev/null 2>&1; then
+                    echo "Tagging $img:latest as $img:previous"
+                    docker image rm $img:previous 2>/dev/null || true
+                    docker tag $img:latest $img:previous
+                else
+                    echo "No existing image for $img:latest found. Skipping backup."
+                fi
+            done
+
             # Create/refresh a local env file for docker compose.
             umask 077
             {
@@ -109,7 +129,8 @@ jobs:
               printf 'EBAY_API_KEY=%s\n' "$(decode "$EBAY_API_KEY_B64")"
             } > .env
 
-            # Load images from tarballs
+            # Load new images
+            echo "Loading new images..."
             docker load < frontend.tar
             docker load < backend.tar
             rm -f frontend.tar backend.tar
@@ -117,8 +138,8 @@ jobs:
             echo "Starting services..."
             docker compose --env-file .env -f "$COMPOSE_FILE" up -d --force-recreate --remove-orphans
 
-            echo "Compose status:"
-            docker compose --env-file .env -f "$COMPOSE_FILE" ps
+            echo "Waiting for services to settle (15s)..."
+            sleep 15
             
             chmod +x healthcheck.sh
             echo "Deployment successful. Ready for health checks."
@@ -131,3 +152,56 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
             ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }} \
             "DEPLOY_ENV='$DEPLOY_ENV' ./healthcheck.sh"
+
+      - name: Rollback on Failure
+        if: failure()
+        env:
+          DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}
+        run: |
+          echo "Health check or deployment failed. Initiating rollback..."
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
+            ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }} \
+            "DEPLOY_ENV='$DEPLOY_ENV' bash -s" << 'EOF'
+            set -euo pipefail
+            
+            DEPLOY_ENV="${DEPLOY_ENV:-dev}"
+            COMPOSE_FILE="docker-compose.yml"
+            if [ "$DEPLOY_ENV" = "prod" ]; then
+              COMPOSE_FILE="docker-compose.prod.yml"
+            fi
+            
+            cd ~
+            
+            echo "Stopping broken services..."
+            docker compose --env-file .env -f "$COMPOSE_FILE" down || true
+
+            echo "Restoring previous images..."
+            for img in gamer-nexus-frontend gamer-nexus-backend; do
+                if docker image inspect $img:previous >/dev/null 2>&1; then
+                    docker tag $img:previous $img:latest
+                    echo "Restored $img:latest from $img:previous"
+                else
+                    echo "No backup found for $img. Cannot restore."
+                fi
+            done
+
+            echo "Restarting previous version..."
+            docker compose --env-file .env -f "$COMPOSE_FILE" up -d --force-recreate --remove-orphans
+            
+            echo "Rollback complete."
+          EOF
+
+      - name: Cleanup on Success
+        if: success()
+        env:
+          DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}
+        run: |
+          echo "Deployment and health checks passed. Cleaning up..."
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
+            ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }} \
+            "bash -s" << 'EOF'
+            echo "Removing previous images..."
+            docker image rm gamer-nexus-frontend:previous gamer-nexus-backend:previous 2>/dev/null || true
+            docker image prune -f
+            echo "Cleanup complete."
+          EOF
