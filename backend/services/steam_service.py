@@ -165,6 +165,7 @@ def update_game_details_systematically(limit=5):
                         game.linux_requirements = json.dumps(linux_req, ensure_ascii=False)
                 
                 updated_count += 1
+                print(f"Updated details for game {game.steam_id} ({updated_count}/{len(games_needing_update)})")
                 # Be nice to API - 1.5s delay to be safer
                 time.sleep(1.5) 
         except Exception as e:
