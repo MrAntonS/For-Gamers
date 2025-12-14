@@ -166,6 +166,14 @@ def update_game_details_systematically(limit=5):
                 
                 updated_count += 1
                 print(f"Updated details for game {game.steam_id} ({updated_count}/{len(games_needing_update)})")
+                
+                # Commit immediately to avoid holding DB locks for long periods
+                try:
+                    db.session.commit()
+                except Exception as e:
+                    db.session.rollback()
+                    print(f"Error committing update for game {game.steam_id}: {e}")
+
                 # Be nice to API - 1.5s delay to be safer
                 time.sleep(1.5) 
         except Exception as e:
@@ -176,12 +184,7 @@ def update_game_details_systematically(limit=5):
                 break
             
     if updated_count > 0:
-        try:
-            db.session.commit()
-            print(f"Systematically updated {updated_count} games.")
-        except Exception as e:
-            db.session.rollback()
-            print(f"Error committing updates: {e}")
+        print(f"Systematically updated {updated_count} games.")
 
 def get_mature_ids(app_ids):
     """
