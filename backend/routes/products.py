@@ -52,11 +52,10 @@ def get_products():
         # - savings_factor: combines absolute savings and discount percentage
         # - verification_boost: 1.25x for verified deals
         from sqlalchemy import case, func as sql_func
-        import math
         
         # Review confidence: log10(reviews + 1) / 5, capped at 1.0
         # SQLite doesn't have log10, so we use ln(x) / ln(10)
-        review_confidence = sql_func.min(
+        review_confidence = sql_func.least(
             sql_func.coalesce(
                 sql_func.log(sql_func.coalesce(Game.review_count, 0) + 1) / math.log(10) / 5.0,
                 0
