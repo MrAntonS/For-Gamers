@@ -146,6 +146,12 @@ def create_app():
     with app.app_context():
         # Create database tables
         db.create_all()
+        # Run small, add-only migrations (handles both sqlite and Postgres)
+        try:
+            from migrate_db import run_migrations
+            run_migrations(app)
+        except Exception as e:
+            print(f"Error running migrations: {e}")
 
         try:
             from routes import products, minmax, auth, external
