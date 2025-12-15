@@ -150,8 +150,9 @@ def create_app():
         try:
             from migrate_db import run_migrations
             run_migrations(app)
-        except Exception as e:
-            print(f"Error running migrations: {e}")
+        except Exception:
+            # Log the full traceback so we have details in the central log
+            app.logger.exception("Error running migrations")
 
         try:
             from routes import products, minmax, auth, external

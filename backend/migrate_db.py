@@ -59,8 +59,8 @@ def _migrate_postgres(engine):
     """Apply the same add-only migrations against Postgres."""
     insp = inspect(engine)
     tables = set(insp.get_table_names())
-
-    with engine.connect() as conn:
+    # Use a transaction/connection that will commit DDL statements
+    with engine.begin() as conn:
         if 'games' in tables:
             cols = {c['name'] for c in insp.get_columns('games')}
 
@@ -98,26 +98,39 @@ def run_migrations(app):
     """
     from models import db
 
-    engine = db.get_engine(app)
+    # Try a few ways to obtain the Engine; be tolerant to different SQLAlchemy versions
+    engine = None
+    try:
+        engine = db.get_engine(app)
+    except Exception:
+        try:
+            engine = db.engine
+        except Exception:
+            try:
+                engine = db.session.get_bind()
+            except Exception:
+                app.logger.exception("Could not obtain SQLAlchemy engine; skipping migrations")
+                return
 
     try:
         dialect = engine.dialect.name
     except Exception:
-        print("Could not determine database dialect, skipping migrations")
+        app.logger.exception("Could not determine database dialect, skipping migrations")
         return
 
-    print(f"Running migrations for dialect: {dialect}")
+    app.logger.info("Running migrations for dialect: %s", dialect)
 
     try:
         if dialect == 'sqlite':
             _migrate_sqlite(engine)
         else:
             _migrate_postgres(engine)
-    except Exception as e:
-        # Don't crash the whole app on migration failure; log and continue.
-        print(f"Migration error: {e}")
-    else:
-        print("Migration complete!")
+    except Exception:
+        app.logger.exception("Migration error")
+        # Don't raise — fail gracefully so app can continue to run
+        return
+
+    app.logger.info("Migration complete!")
 
 
 if __name__ == '__main__':
