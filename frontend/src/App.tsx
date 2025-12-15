@@ -7,6 +7,7 @@ import HardwareDeals from './components/HardwareDeals'
 import MinMaxTab from './components/MinMaxTab'
 import SearchResults from './components/SearchResults'
 import IntegrationTest from './components/IntegrationTest'
+import ProductPage from './components/ProductPage'
 import { CartProvider } from './contexts/CartContext'
 import { AuthProvider } from './contexts/AuthContext'
 import './App.css'
@@ -24,6 +25,7 @@ function App() {
                 <Route path="/deals" element={<ProductList />} />
                 <Route path="/deals/games" element={<GameDeals />} />
                 <Route path="/deals/hardware" element={<HardwareDeals />} />
+                <Route path="/product/:id" element={<ProductPage />} />
                 <Route path="/minmax" element={<MinMaxTab />} />
                 <Route path="/search" element={<SearchResults />} />
                 <Route path="/integration" element={<IntegrationTest />} />

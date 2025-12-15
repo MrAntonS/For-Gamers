@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
 
 export interface ProductCardProps {
@@ -40,6 +41,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   fallbackImage = "https://placehold.co/400x600?text=No+Image"
 }) => {
   const { addToCart } = useCart();
+  const navigate = useNavigate();
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -54,6 +56,14 @@ const ProductCard: React.FC<ProductCardProps> = ({
       });
     }
   };
+
+  const handleClick = () => {
+    if (onClick) {
+      onClick();
+    } else if (id) {
+      navigate(`/product/${id}?category=${encodeURIComponent(category)}`);
+    }
+  };
   
   const containerStyle = {
     ...style,
@@ -65,7 +75,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
     <div 
       className={`bg-gray-900 border border-gray-700 rounded-xl shadow-2xl transition-all duration-500 ease-out cursor-pointer hover:border-red-500 ${enableHoverReveal ? 'group relative hover:z-[100] hover:rounded-b-none overflow-visible' : 'overflow-hidden'} ${className}`}
       style={containerStyle}
-      onClick={onClick}
+      onClick={handleClick}
     >
       <div className={`h-3/5 w-full bg-gray-800 relative ${enableHoverReveal ? 'rounded-t-xl overflow-hidden' : ''}`}>
         <img 

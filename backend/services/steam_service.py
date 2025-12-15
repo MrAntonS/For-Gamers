@@ -558,6 +558,15 @@ def save_cheapshark_deal(deal):
                 has_changes = True
         except (ValueError, TypeError):
             pass
+        
+        # Review count
+        try:
+            new_review_count = int(deal.get('steamRatingCount', 0))
+            if (game.review_count or 0) != new_review_count:
+                game.review_count = new_review_count
+                has_changes = True
+        except (ValueError, TypeError):
+            pass
             
         if is_new or has_changes:
             db.session.add(game)

@@ -43,8 +43,12 @@ def get_products():
         # Pagination
         total_games = query.count()
         
-        # Sort by discount percentage descending
-        games = query.order_by(Game.discount.desc(), Game.last_updated.desc()).paginate(page=page, per_page=limit, error_out=False)
+        # Sort by rating (desc) > review_count (desc) > discount (desc)
+        games = query.order_by(
+            Game.rating.desc().nullslast(),
+            Game.review_count.desc().nullslast(),
+            Game.discount.desc()
+        ).paginate(page=page, per_page=limit, error_out=False)
         
         products = [game.to_dict() for game in games.items]
         
@@ -812,5 +816,204 @@ def get_products():
         "total_pages": total_pages,
         "current_page": page
     })
+
+
+@products_bp.route('/api/products/<int:product_id>')
+def get_product_by_id(product_id):
+    """
+    Get a single product by its ID.
+    For games, fetches from the database.
+    For hardware, uses mock data.
+    """
+    category = request.args.get('category', 'Game')
+    
+    if category == 'Game':
+        # Try to find the game in the database
+        game = Game.query.get(product_id)
+        if game:
+            return jsonify(game.to_dict())
+        return jsonify({"error": "Product not found"}), 404
+    
+    # For hardware (mock data), search in the mock_products list
+    mock_products = [
+        {
+            "id": 2,
+            "name": "RTX 4070 Ti",
+            "price": "$799.99",
+            "originalPrice": "$899.99",
+            "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-11%",
+            "rating": 4.8,
+            "brand": "NVIDIA",
+            "description": "The GeForce RTX 4070 Ti delivers the ultra performance and features that enthusiast gamers and creators demand. Bring your games and creative projects to life with ray tracing and AI-powered graphics. It's built with the ultra-efficient NVIDIA Ada Lovelace architecture and up to 12GB of superfast G6X memory."
+        },
+        {
+            "id": 4,
+            "name": "Gaming Mouse Pro",
+            "price": "$49.99",
+            "originalPrice": "$89.99",
+            "image": "https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-45%",
+            "rating": 4.6,
+            "brand": "Logitech",
+            "description": "Engineered for pro-grade performance, responsiveness, and durability. The ultimate weapon for your gaming arsenal."
+        },
+        {
+            "id": 6,
+            "name": "Mechanical Keyboard",
+            "price": "$129.99",
+            "originalPrice": "$159.99",
+            "image": "https://images.unsplash.com/photo-1587829741301-dc798b91a603?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-20%",
+            "rating": 4.7,
+            "brand": "Corsair",
+            "description": "The iconic mechanical gaming keyboard with an aircraft-grade aluminum frame and dynamic RGB backlighting."
+        },
+        {
+            "id": 7,
+            "name": "Xbox Series X",
+            "price": "$449.99",
+            "originalPrice": "$499.99",
+            "image": "https://images.unsplash.com/photo-1621259182978-fbf93132d53d?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-10%",
+            "rating": 4.8,
+            "brand": "Microsoft",
+            "description": "The fastest, most powerful Xbox ever. Explore rich new worlds with 12 teraflops of raw graphic processing power."
+        },
+        {
+            "id": 8,
+            "name": "PlayStation 5",
+            "price": "$499.99",
+            "originalPrice": "$499.99",
+            "image": "https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "0%",
+            "rating": 4.9,
+            "brand": "Sony",
+            "description": "Experience lightning fast loading with an ultra-high speed SSD, deeper immersion with haptic feedback, and 3D Audio."
+        },
+        {
+            "id": 9,
+            "name": "Nintendo Switch OLED",
+            "price": "$349.99",
+            "originalPrice": "$349.99",
+            "image": "https://images.unsplash.com/photo-1578303512597-81e6cc155b3e?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "0%",
+            "rating": 4.7,
+            "brand": "Nintendo",
+            "description": "Play at home on the TV or on-the-go with a vibrant 7-inch OLED screen with the Nintendo Switch – OLED Model system."
+        },
+        {
+            "id": 13,
+            "name": "Gaming Headset",
+            "price": "$79.99",
+            "originalPrice": "$99.99",
+            "image": "https://images.unsplash.com/photo-1618366712010-f4ae9c647dcb?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-20%",
+            "rating": 4.4,
+            "brand": "Razer",
+            "description": "Immersive 7.1 surround sound for positional audio. Ultra-lightweight design for prolonged gaming marathons."
+        },
+        {
+            "id": 14,
+            "name": "4K Gaming Monitor",
+            "price": "$399.99",
+            "originalPrice": "$499.99",
+            "image": "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-20%",
+            "rating": 4.7,
+            "brand": "LG",
+            "description": "Experience your games in stunning 4K resolution with a 144Hz refresh rate and 1ms response time for competitive gaming."
+        },
+        {
+            "id": 15,
+            "name": "SSD 2TB",
+            "price": "$129.99",
+            "originalPrice": "$159.99",
+            "image": "https://images.unsplash.com/photo-1628557044797-f21a177c37ec?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-19%",
+            "rating": 4.8,
+            "brand": "Samsung",
+            "description": "Reach max performance of PCIe 4.0. Experience longer-lasting, opponent-blasting speed. The smart heat control delivers power efficiency."
+        },
+        {
+            "id": 16,
+            "name": "DDR5 RAM 32GB",
+            "price": "$109.99",
+            "originalPrice": "$139.99",
+            "image": "https://images.unsplash.com/photo-1562976540-1502c2145186?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-21%",
+            "rating": 4.7,
+            "brand": "G.Skill",
+            "description": "Push the limits of performance with DDR5 memory. Faster frequencies, greater capacities, and better performance."
+        },
+        {
+            "id": 17,
+            "name": "Gaming Chair",
+            "price": "$199.99",
+            "originalPrice": "$249.99",
+            "image": "https://images.unsplash.com/photo-1598550476439-6847785fcea6?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-20%",
+            "rating": 4.3,
+            "brand": "Secretlab",
+            "description": "Ergonomic design for all-day comfort. Features adjustable lumbar support, 4D armrests, and premium PU leather."
+        },
+        {
+            "id": 18,
+            "name": "Webcam 4K",
+            "price": "$149.99",
+            "originalPrice": "$199.99",
+            "image": "https://images.unsplash.com/photo-1587826337417-96fff778df71?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-25%",
+            "rating": 4.5,
+            "brand": "Logitech",
+            "description": "Look your best in every video meeting and stream. Ultra 4K HD resolution with HDR technology for clear video in any light."
+        },
+        {
+            "id": 19,
+            "name": "Microphone",
+            "price": "$129.99",
+            "originalPrice": "$149.99",
+            "image": "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-13%",
+            "rating": 4.6,
+            "brand": "Blue",
+            "description": "The ultimate professional USB microphone. Tri-capsule array records almost any situation. Multiple pattern selection."
+        },
+        {
+            "id": 20,
+            "name": "Capture Card",
+            "price": "$179.99",
+            "originalPrice": "$199.99",
+            "image": "https://images.unsplash.com/photo-1593640408182-31c70c8268f5?auto=format&fit=crop&w=400&q=80",
+            "category": "Hardware",
+            "discount": "-10%",
+            "rating": 4.5,
+            "brand": "Elgato",
+            "description": "Stream and record in 1080p60 HDR10 or 4K30. Ultra-low latency technology. Plug and play functionality."
+        }
+    ]
+    
+    # Search for the product by ID
+    for product in mock_products:
+        if product['id'] == product_id:
+            # Add title field for consistency
+            product['title'] = product['name']
+            return jsonify(product)
+    
+    return jsonify({"error": "Product not found"}), 404
+
 
 

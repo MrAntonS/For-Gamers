@@ -10,38 +10,38 @@ const Hero = () => {
   useEffect(() => {
     const fetchDeals = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/products?limit=50`);
-        if (response.ok) {
-          const data = await response.json();
-          const products = data.products;
-          
-          const games = products
-            .filter((p: any) => p.category === 'Game')
-            .map((p: any) => ({
-              id: p.id,
-              title: p.name,
-              price: p.price,
-              originalPrice: p.originalPrice,
-              image: p.image,
-              category: p.category,
-              rating: p.rating,
-              description: p.description
-            }));
-
-          const hardware = products
-            .filter((p: any) => p.category === 'Hardware')
-            .map((p: any) => ({
-              id: p.id,
-              title: p.name,
-              price: p.price,
-              originalPrice: p.originalPrice,
-              image: p.image,
-              category: p.category,
-              rating: p.rating,
-              description: p.description
-            }));
-
+        // Fetch games from database (category=Game triggers DB query)
+        const gamesResponse = await fetch(`${API_BASE_URL}/api/products?category=Game&limit=20`);
+        // Fetch hardware (uses mock data for now)
+        const hardwareResponse = await fetch(`${API_BASE_URL}/api/products?category=Hardware&limit=20`);
+        
+        if (gamesResponse.ok) {
+          const gamesData = await gamesResponse.json();
+          const games = gamesData.products.map((p: any) => ({
+            id: p.id,
+            title: p.title || p.name,
+            price: p.price,
+            originalPrice: p.originalPrice,
+            image: p.image,
+            category: p.category,
+            rating: p.rating,
+            description: p.description
+          }));
           setGameDeals(games);
+        }
+
+        if (hardwareResponse.ok) {
+          const hardwareData = await hardwareResponse.json();
+          const hardware = hardwareData.products.map((p: any) => ({
+            id: p.id,
+            title: p.name || p.title,
+            price: p.price,
+            originalPrice: p.originalPrice,
+            image: p.image,
+            category: p.category,
+            rating: p.rating,
+            description: p.description
+          }));
           setHardwareDeals(hardware);
         }
       } catch (error) {

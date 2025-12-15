@@ -33,7 +33,8 @@ class Game(db.Model):
     discount = db.Column(db.Integer, default=0)
     image_url = db.Column(db.String(512), nullable=True)
     description = db.Column(db.Text, nullable=True)
-    rating = db.Column(db.Float, nullable=True) # Placeholder, Steam doesn't give easy rating in search
+    rating = db.Column(db.Float, nullable=True) # Steam rating as 0-5 stars
+    review_count = db.Column(db.Integer, default=0) # Number of Steam reviews
     is_mature = db.Column(db.Boolean, default=False)
     genres = db.Column(db.String(512), nullable=True) # Comma separated genres
     pc_requirements = db.Column(db.Text, nullable=True) # JSON string or text
@@ -53,6 +54,7 @@ class Game(db.Model):
             'image': self.image_url,
             'description': self.description,
             'rating': self.rating,
+            'reviewCount': self.review_count,
             'category': 'Game',
             'brand': 'Steam',
             'genres': self.genres.split(',') if self.genres else [],
