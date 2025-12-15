@@ -21,6 +21,7 @@ for db_file in db_files:
             columns = [row[1] for row in cursor.fetchall()]
             print(f"  Columns in games: {columns}")
             
+            # Add review_count if missing
             if 'review_count' not in columns:
                 print("  Adding review_count column...")
                 cursor.execute("ALTER TABLE games ADD COLUMN review_count INTEGER DEFAULT 0")
@@ -28,6 +29,24 @@ for db_file in db_files:
                 print("  Column added successfully!")
             else:
                 print("  review_count column already exists")
+            
+            # Add is_active if missing
+            if 'is_active' not in columns:
+                print("  Adding is_active column...")
+                cursor.execute("ALTER TABLE games ADD COLUMN is_active BOOLEAN DEFAULT 1")
+                conn.commit()
+                print("  Column added successfully!")
+            else:
+                print("  is_active column already exists")
+            
+            # Add deal_last_verified if missing
+            if 'deal_last_verified' not in columns:
+                print("  Adding deal_last_verified column...")
+                cursor.execute("ALTER TABLE games ADD COLUMN deal_last_verified DATETIME")
+                conn.commit()
+                print("  Column added successfully!")
+            else:
+                print("  deal_last_verified column already exists")
         
         conn.close()
     else:

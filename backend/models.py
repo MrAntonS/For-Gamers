@@ -36,6 +36,8 @@ class Game(db.Model):
     rating = db.Column(db.Float, nullable=True) # Steam rating as 0-5 stars
     review_count = db.Column(db.Integer, default=0) # Number of Steam reviews
     is_mature = db.Column(db.Boolean, default=False)
+    is_active = db.Column(db.Boolean, default=True) # Whether the deal is currently active
+    deal_last_verified = db.Column(db.DateTime(timezone=True), nullable=True) # When we last verified deal is still active
     genres = db.Column(db.String(512), nullable=True) # Comma separated genres
     pc_requirements = db.Column(db.Text, nullable=True) # JSON string or text
     mac_requirements = db.Column(db.Text, nullable=True) # JSON string or text
@@ -55,6 +57,9 @@ class Game(db.Model):
             'description': self.description,
             'rating': self.rating,
             'reviewCount': self.review_count,
+            'isActive': self.is_active,
+            'lastUpdated': self.last_updated.isoformat() if self.last_updated else None,
+            'dealLastVerified': self.deal_last_verified.isoformat() if self.deal_last_verified else None,
             'category': 'Game',
             'brand': 'Steam',
             'genres': self.genres.split(',') if self.genres else [],

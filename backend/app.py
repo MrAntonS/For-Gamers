@@ -186,17 +186,23 @@ def background_task(app):
     Background task to continuously fetch games from Steam.
     """
     import time
-    from services.steam_service import fetch_cheapshark_deals, update_game_details_systematically
+    from services.steam_service import (
+        fetch_cheapshark_deals, 
+        update_game_details_systematically,
+        verify_and_update_stale_deals,
+        reactivate_deals_from_cheapshark
+    )
     
     with app.app_context():
         first_run = True
+        run_count = 0
         while True:
             print("Running background Steam fetch...")
             
             # Fetch more pages on first run to populate DB
             pages = 50 if first_run else 5
             
-            # 1. Fetch deals from CheapShark
+            # 1. Fetch deals from CheapShark (this will also reactivate any deals that come back)
             try:
                 fetch_cheapshark_deals(pages=pages)
             except Exception as e:
@@ -204,11 +210,24 @@ def background_task(app):
 
             # 2. Update details for games that miss them
             try:
-                # Update details for games that miss them (e.g. description)
-                # Increased limit to catch up faster with missing descriptions
                 update_game_details_systematically(limit=50)
             except Exception as e:
                 print(f"Error in Steam details update: {e}")
+            
+            # 3. Verify stale deals directly on Steam (check 10 deals per run)
+            # This catches deals that expired between CheapShark updates
+            try:
+                verify_and_update_stale_deals(hours_threshold=12, batch_size=10)
+            except Exception as e:
+                print(f"Error verifying stale deals: {e}")
+            
+            # 4. Every 6th run (~1 hour), check if any inactive games have new deals
+            run_count += 1
+            if run_count % 6 == 0:
+                try:
+                    reactivate_deals_from_cheapshark()
+                except Exception as e:
+                    print(f"Error reactivating deals: {e}")
             
             first_run = False
             # Sleep for 10 minutes

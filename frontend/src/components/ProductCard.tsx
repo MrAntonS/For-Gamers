@@ -20,6 +20,7 @@ export interface ProductCardProps {
   enableHoverReveal?: boolean; // Keeping for compatibility
   fallbackImage?: string;
   brand?: string;
+  isVerified?: boolean;
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ 
@@ -38,7 +39,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
   description,
   enableHoverReveal = true,
   showAddToCart = true,
-  fallbackImage = "https://placehold.co/400x600?text=No+Image"
+  fallbackImage = "https://placehold.co/400x600?text=No+Image",
+  isVerified = false
 }) => {
   const { addToCart } = useCart();
   const navigate = useNavigate();
@@ -86,8 +88,17 @@ const ProductCard: React.FC<ProductCardProps> = ({
             (e.target as HTMLImageElement).src = fallbackImage;
           }}
         />
-        <div className="absolute top-1 right-1 2xl:top-2 2xl:right-2 bg-red-600 text-white text-[10px] 2xl:text-xs font-bold px-1.5 py-0.5 2xl:px-2 2xl:py-1 rounded">
-          {category}
+        <div className="absolute top-1 right-1 2xl:top-2 2xl:right-2 flex items-center gap-1">
+          {isVerified && (
+            <div className="bg-green-600 text-white p-0.5 2xl:p-1 rounded" title="Deal verified">
+              <svg className="w-3 h-3 2xl:w-4 2xl:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+          )}
+          <div className="bg-red-600 text-white text-[10px] 2xl:text-xs font-bold px-1.5 py-0.5 2xl:px-2 2xl:py-1 rounded">
+            {category}
+          </div>
         </div>
       </div>
       <div className="p-2 2xl:p-4 text-left flex flex-col h-[40%]">

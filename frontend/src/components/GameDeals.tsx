@@ -12,6 +12,7 @@ interface GameDeal {
   image: string;
   rating: number;
   description?: string;
+  dealLastVerified?: string;
 }
 
 const FilterSection = ({ title, children }: { title: string, children: React.ReactNode }) => (
@@ -60,7 +61,8 @@ const GameDeals = () => {
           category: p.category,
           image: p.image,
           rating: p.rating,
-          description: p.description
+          description: p.description,
+          dealLastVerified: p.dealLastVerified
         }));
         setGames(mappedGames);
         setTotalPages(data.totalPages || 1);
@@ -202,6 +204,7 @@ const GameDeals = () => {
                   category={game.category}
                   rating={game.rating}
                   description={game.description}
+                  isVerified={!!game.dealLastVerified}
                   className="h-[350px]"
                 />
               ))}

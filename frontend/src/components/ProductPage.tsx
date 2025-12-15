@@ -13,6 +13,7 @@ interface Product {
   image: string;
   category: string;
   rating?: number;
+  reviewCount?: number;
   description?: string;
   brand?: string;
   discount?: string;
@@ -20,6 +21,8 @@ interface Product {
   pc_requirements?: string;
   mac_requirements?: string;
   linux_requirements?: string;
+  lastUpdated?: string;
+  dealLastVerified?: string;
 }
 
 const ProductPage: React.FC = () => {
@@ -49,6 +52,15 @@ const ProductPage: React.FC = () => {
         }
         const data = await response.json();
         setProduct(data);
+        
+        // Trigger background verification for games
+        if (category === 'Game') {
+          fetch(`${API_BASE_URL}/api/products/${id}/verify?category=${category}`, {
+            method: 'POST'
+          }).catch(() => {
+            // Silently ignore verification errors - it's not critical
+          });
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load product');
       } finally {
@@ -179,6 +191,11 @@ const ProductPage: React.FC = () => {
                 <span className="ml-2 text-gray-400 text-sm">
                   {product.rating.toFixed(1)} / 5.0
                 </span>
+                {product.reviewCount !== undefined && product.reviewCount > 0 && (
+                  <span className="ml-3 text-gray-500 text-sm">
+                    ({product.reviewCount.toLocaleString()} reviews)
+                  </span>
+                )}
               </div>
             )}
 
@@ -210,10 +227,20 @@ const ProductPage: React.FC = () => {
               </div>
 
               {hasDiscount && (
-                <p className="text-green-500 text-sm mb-4">
+                <p className="text-green-500 text-sm mb-2">
                   You save {product.discount} on this purchase!
                 </p>
               )}
+
+              <p className="text-gray-500 text-xs mb-4 flex items-center gap-1">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {product.dealLastVerified 
+                  ? `Deal verified: ${new Date(product.dealLastVerified).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+                  : "This deal hasn't been verified yet"
+                }
+              </p>
 
               <button
                 onClick={handleAddToCart}

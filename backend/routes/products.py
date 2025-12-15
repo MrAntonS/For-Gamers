@@ -1,10 +1,13 @@
 from flask import Blueprint, jsonify, request
 import math
+import threading
+from datetime import datetime
 from services.steam_service import (
     get_steam_featured,
     save_game_to_db,
     update_game_details_systematically,
     fetch_cheapshark_deals,
+    verify_deal_on_steam,
 )
 from models import Game, db
 
@@ -29,8 +32,8 @@ def get_products():
         # Query DB for results
         query = Game.query
         
-        # Filter for actual deals (best deals, by percentage)
-        query = query.filter(Game.discount > 0)
+        # Filter for active deals only (discount > 0 and is_active = True)
+        query = query.filter(Game.discount > 0, Game.is_active == True)
 
         # If we still have no deals, try one more lightweight fetch.
         # This covers cases where the DB has games but none have discounts yet.
@@ -1014,6 +1017,79 @@ def get_product_by_id(product_id):
             return jsonify(product)
     
     return jsonify({"error": "Product not found"}), 404
+
+
+def verify_game_in_background(game_id, app):
+    """
+    Background task to verify a game's deal on Steam.
+    Runs in a separate thread to not block the response.
+    """
+    with app.app_context():
+        try:
+            game = Game.query.get(game_id)
+            if not game or not game.steam_id:
+                return
+                
+            result = verify_deal_on_steam(game.steam_id)
+            
+            if result is None:
+                # Couldn't verify, just update verification time
+                game.deal_last_verified = datetime.utcnow()
+                db.session.commit()
+                return
+                
+            is_on_sale, current_price, original_price, discount = result
+            
+            if is_on_sale:
+                # Update price info if changed
+                if abs((game.price or 0) - current_price) > 0.01:
+                    game.price = current_price
+                if abs((game.original_price or 0) - original_price) > 0.01:
+                    game.original_price = original_price
+                if game.discount != discount:
+                    game.discount = discount
+                game.is_active = True
+            else:
+                # Deal has expired
+                game.is_active = False
+                game.discount = 0
+                game.price = game.original_price
+                
+            game.deal_last_verified = datetime.utcnow()
+            db.session.commit()
+            print(f"Verified deal for {game.title}: on_sale={is_on_sale}, discount={discount}%")
+        except Exception as e:
+            print(f"Error verifying game {game_id}: {e}")
+
+
+@products_bp.route('/api/products/<int:product_id>/verify', methods=['POST'])
+def verify_product(product_id):
+    """
+    Trigger a background verification of a game deal.
+    Returns immediately while verification happens in background.
+    """
+    category = request.args.get('category', 'Game')
+    
+    if category != 'Game':
+        return jsonify({"message": "Verification only available for games"}), 200
+    
+    game = Game.query.get(product_id)
+    if not game:
+        return jsonify({"error": "Product not found"}), 404
+    
+    if not game.steam_id:
+        return jsonify({"message": "No Steam ID for verification"}), 200
+    
+    # Get the Flask app from current context
+    from flask import current_app
+    app = current_app._get_current_object()
+    
+    # Start background verification
+    thread = threading.Thread(target=verify_game_in_background, args=(product_id, app))
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({"message": "Verification started"}), 202
 
 
 

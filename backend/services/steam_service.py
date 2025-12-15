@@ -2,6 +2,7 @@ import requests
 import os
 import time
 import json
+from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 from models import db, Game
 from sqlalchemy.exc import IntegrityError
@@ -569,6 +570,9 @@ def save_cheapshark_deal(deal):
             pass
             
         if is_new or has_changes:
+            # Mark as active and update verification time
+            game.is_active = True
+            game.deal_last_verified = datetime.utcnow()
             db.session.add(game)
             db.session.commit()
             return True
@@ -578,4 +582,202 @@ def save_cheapshark_deal(deal):
         db.session.rollback()
         print(f"Error saving CheapShark deal {deal.get('title')}: {e}")
         return False
+
+
+def verify_deal_on_steam(steam_id):
+    """
+    Check Steam's API to verify if a game is still on sale.
+    Returns tuple: (is_on_sale, current_price, original_price, discount_percent) or None if error
+    """
+    try:
+        url = f"https://store.steampowered.com/api/appdetails?appids={steam_id}&cc=us"
+        response = requests.get(url, timeout=10)
+        
+        if response.status_code != 200:
+            return None
+            
+        data = response.json()
+        app_data = data.get(str(steam_id), {})
+        
+        if not app_data.get('success'):
+            return None
+            
+        game_data = app_data.get('data', {})
+        price_overview = game_data.get('price_overview')
+        
+        if not price_overview:
+            # Game might be free or unavailable
+            return None
+            
+        discount = price_overview.get('discount_percent', 0)
+        final_price = price_overview.get('final', 0) / 100
+        initial_price = price_overview.get('initial', 0) / 100
+        
+        is_on_sale = discount > 0
+        
+        return (is_on_sale, final_price, initial_price, discount)
+    except Exception as e:
+        print(f"Error verifying deal on Steam for {steam_id}: {e}")
+        return None
+
+
+def verify_and_update_stale_deals(hours_threshold=24, batch_size=10):
+    """
+    Find deals that haven't been verified recently and check Steam directly.
+    This ensures we catch expired deals even if CheapShark hasn't updated.
+    
+    Args:
+        hours_threshold: Hours since last verification to consider a deal stale
+        batch_size: Number of deals to verify per run (to avoid rate limiting)
+    """
+    try:
+        cutoff_time = datetime.utcnow() - timedelta(hours=hours_threshold)
+        
+        # Find active deals that haven't been verified recently
+        stale_deals = Game.query.filter(
+            Game.is_active == True,
+            Game.discount > 0,
+            (Game.deal_last_verified == None) | (Game.deal_last_verified < cutoff_time)
+        ).limit(batch_size).all()
+        
+        if not stale_deals:
+            return 0
+            
+        print(f"Verifying {len(stale_deals)} stale deals on Steam...")
+        
+        updated_count = 0
+        deactivated_count = 0
+        
+        for game in stale_deals:
+            if not game.steam_id:
+                continue
+                
+            result = verify_deal_on_steam(game.steam_id)
+            
+            if result is None:
+                # Couldn't verify, just update verification time to try again later
+                game.deal_last_verified = datetime.utcnow()
+                continue
+                
+            is_on_sale, current_price, original_price, discount = result
+            
+            if is_on_sale:
+                # Deal is still active - update price info if changed
+                if abs((game.price or 0) - current_price) > 0.01:
+                    game.price = current_price
+                    updated_count += 1
+                if abs((game.original_price or 0) - original_price) > 0.01:
+                    game.original_price = original_price
+                if game.discount != discount:
+                    game.discount = discount
+                game.deal_last_verified = datetime.utcnow()
+            else:
+                # Deal has expired - mark as inactive but keep the game info
+                game.is_active = False
+                game.discount = 0
+                game.price = game.original_price  # Reset to original price
+                game.deal_last_verified = datetime.utcnow()
+                deactivated_count += 1
+                print(f"Deal expired: {game.title} (Steam ID: {game.steam_id})")
+            
+            # Rate limiting - be nice to Steam's API
+            time.sleep(1)
+        
+        db.session.commit()
+        
+        if updated_count > 0 or deactivated_count > 0:
+            print(f"Deal verification complete: {updated_count} updated, {deactivated_count} deactivated")
+        
+        return deactivated_count
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error verifying stale deals: {e}")
+        return 0
+
+
+def reactivate_deals_from_cheapshark():
+    """
+    Check if any inactive games have new deals on CheapShark.
+    If a game was previously on sale, became inactive, and is now on sale again,
+    reactivate it with the new deal info.
+    """
+    try:
+        # Get inactive games that might have new deals
+        inactive_games = Game.query.filter(
+            Game.is_active == False,
+            Game.steam_id != None
+        ).all()
+        
+        if not inactive_games:
+            return 0
+            
+        # Build a set of steam_ids to check
+        inactive_steam_ids = {game.steam_id for game in inactive_games}
+        
+        # Fetch current deals from CheapShark
+        base_url = "https://www.cheapshark.com/api/1.0/deals"
+        current_deals = {}
+        
+        for page in range(5):  # Check first 5 pages
+            params = {
+                "storeID": "1",
+                "pageSize": "60",
+                "pageNumber": str(page)
+            }
+            
+            try:
+                response = requests.get(base_url, params=params, timeout=10)
+                if response.status_code != 200:
+                    break
+                    
+                deals = response.json()
+                if not deals:
+                    break
+                    
+                for deal in deals:
+                    steam_id = deal.get('steamAppID')
+                    if steam_id:
+                        try:
+                            current_deals[int(steam_id)] = deal
+                        except ValueError:
+                            pass
+                            
+                time.sleep(0.5)
+            except Exception as e:
+                print(f"Error fetching deals for reactivation check: {e}")
+                break
+        
+        # Check which inactive games now have deals
+        reactivated_count = 0
+        
+        for game in inactive_games:
+            if game.steam_id in current_deals:
+                deal = current_deals[game.steam_id]
+                
+                try:
+                    new_price = float(deal.get('salePrice', 0))
+                    new_original = float(deal.get('normalPrice', 0))
+                    new_discount = int(float(deal.get('savings', 0)))
+                    
+                    if new_discount > 0:
+                        # Reactivate the deal
+                        game.price = new_price
+                        game.original_price = new_original
+                        game.discount = new_discount
+                        game.is_active = True
+                        game.deal_last_verified = datetime.utcnow()
+                        reactivated_count += 1
+                        print(f"Reactivated deal: {game.title} ({new_discount}% off)")
+                except (ValueError, TypeError):
+                    pass
+        
+        if reactivated_count > 0:
+            db.session.commit()
+            print(f"Reactivated {reactivated_count} deals")
+        
+        return reactivated_count
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error reactivating deals: {e}")
+        return 0
 
