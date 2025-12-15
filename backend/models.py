@@ -38,6 +38,7 @@ class Game(db.Model):
     is_mature = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=True) # Whether the deal is currently active
     deal_last_verified = db.Column(db.DateTime(timezone=True), nullable=True) # When we last verified deal is still active
+    deal_ends_at = db.Column(db.DateTime(timezone=True), nullable=True) # When the deal expires (if known)
     genres = db.Column(db.String(512), nullable=True) # Comma separated genres
     pc_requirements = db.Column(db.Text, nullable=True) # JSON string or text
     mac_requirements = db.Column(db.Text, nullable=True) # JSON string or text
@@ -92,10 +93,43 @@ class Game(db.Model):
             'isActive': self.is_active,
             'lastUpdated': self.last_updated.isoformat() if self.last_updated else None,
             'dealLastVerified': self.deal_last_verified.isoformat() if self.deal_last_verified else None,
+            'dealEndsAt': self.deal_ends_at.isoformat() if self.deal_ends_at else None,
             'category': 'Game',
             'brand': 'Steam',
             'genres': self.genres.split(',') if self.genres else [],
             'pc_requirements': self.pc_requirements,
             'mac_requirements': self.mac_requirements,
             'linux_requirements': self.linux_requirements
+        }
+
+
+class DealHistory(db.Model):
+    """
+    Tracks historical price/deal data for games over time.
+    A new record is created whenever a deal's price changes.
+    """
+    __tablename__ = 'deal_history'
+
+    id = db.Column(db.Integer, primary_key=True)
+    game_id = db.Column(db.Integer, db.ForeignKey('games.id'), nullable=False)
+    price = db.Column(db.Float, nullable=False)
+    original_price = db.Column(db.Float, nullable=True)
+    discount = db.Column(db.Integer, default=0)  # Percentage
+    is_active = db.Column(db.Boolean, default=True)  # Was the deal active at this point
+    recorded_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
+    
+    # Relationship to Game
+    game = db.relationship('Game', backref=db.backref('price_history', lazy='dynamic'))
+
+    def to_dict(self):
+        savings = (self.original_price or 0) - (self.price or 0)
+        return {
+            'id': self.id,
+            'gameId': self.game_id,
+            'price': self.price,
+            'originalPrice': self.original_price,
+            'discount': self.discount,
+            'savings': round(savings, 2) if savings > 0 else 0,
+            'isActive': self.is_active,
+            'recordedAt': self.recorded_at.isoformat() if self.recorded_at else None
         }

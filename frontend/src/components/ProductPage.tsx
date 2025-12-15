@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
 import { API_BASE_URL } from '../config';
+import DealHistoryChart from './DealHistoryChart';
 
 interface Product {
   id: number;
@@ -23,7 +24,69 @@ interface Product {
   linux_requirements?: string;
   lastUpdated?: string;
   dealLastVerified?: string;
+  dealEndsAt?: string;
 }
+
+// Countdown timer component for deal end dates
+const DealCountdown: React.FC<{ endDate: string }> = ({ endDate }) => {
+  const [timeLeft, setTimeLeft] = useState<{
+    days: number;
+    hours: number;
+    minutes: number;
+    seconds: number;
+  } | null>(null);
+
+  useEffect(() => {
+    const calculateTimeLeft = () => {
+      const end = new Date(endDate).getTime();
+      const now = Date.now();
+      const diff = end - now;
+
+      if (diff <= 0) {
+        setTimeLeft(null);
+        return;
+      }
+
+      setTimeLeft({
+        days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+        minutes: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
+        seconds: Math.floor((diff % (1000 * 60)) / 1000)
+      });
+    };
+
+    calculateTimeLeft();
+    const interval = setInterval(calculateTimeLeft, 1000);
+    return () => clearInterval(interval);
+  }, [endDate]);
+
+  if (!timeLeft) {
+    return <p className="text-red-400 text-xs mt-1">Deal has expired!</p>;
+  }
+
+  return (
+    <div className="flex gap-2 mt-2">
+      {timeLeft.days > 0 && (
+        <div className="text-center">
+          <span className="text-lg font-bold text-yellow-300">{timeLeft.days}</span>
+          <span className="text-xs text-yellow-400/70 block">days</span>
+        </div>
+      )}
+      <div className="text-center">
+        <span className="text-lg font-bold text-yellow-300">{String(timeLeft.hours).padStart(2, '0')}</span>
+        <span className="text-xs text-yellow-400/70 block">hrs</span>
+      </div>
+      <div className="text-center">
+        <span className="text-lg font-bold text-yellow-300">{String(timeLeft.minutes).padStart(2, '0')}</span>
+        <span className="text-xs text-yellow-400/70 block">min</span>
+      </div>
+      <div className="text-center">
+        <span className="text-lg font-bold text-yellow-300">{String(timeLeft.seconds).padStart(2, '0')}</span>
+        <span className="text-xs text-yellow-400/70 block">sec</span>
+      </div>
+    </div>
+  );
+};
 
 const ProductPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -232,9 +295,30 @@ const ProductPage: React.FC = () => {
                 </p>
               )}
 
+              {/* Deal End Date */}
+              {product.dealEndsAt && (
+                <div className="bg-yellow-900/30 border border-yellow-600/50 rounded-lg p-3 mb-3">
+                  <div className="flex items-center gap-2 text-yellow-400">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-sm font-medium">
+                      Deal ends: {new Date(product.dealEndsAt).toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                  </div>
+                  <DealCountdown endDate={product.dealEndsAt} />
+                </div>
+              )}
+
               <p className="text-gray-500 text-xs mb-4 flex items-center gap-1">
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 {product.dealLastVerified 
                   ? `Deal verified: ${new Date(product.dealLastVerified).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
@@ -286,6 +370,13 @@ const ProductPage: React.FC = () => {
         {/* System Requirements (for games) */}
         {product.category === 'Game' && product.pc_requirements && (
           <SystemRequirements requirements={product.pc_requirements} />
+        )}
+
+        {/* Deal History Chart (for games) */}
+        {product.category === 'Game' && (
+          <div className="mt-12 border-t border-gray-800 pt-8">
+            <DealHistoryChart gameId={product.id} />
+          </div>
         )}
       </div>
     </div>

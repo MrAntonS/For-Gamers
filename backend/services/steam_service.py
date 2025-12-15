@@ -2,12 +2,136 @@ import requests
 import os
 import time
 import json
+import threading
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
-from models import db, Game
+from models import db, Game, DealHistory
 from sqlalchemy.exc import IntegrityError
 
 STEAM_API_KEY = os.environ.get("STEAM_API_KEY")
+
+
+class SteamRateLimiter:
+    """
+    Global rate limiter for Steam API requests.
+    Implements exponential backoff on 429 errors.
+    """
+    _instance = None
+    _lock = threading.Lock()
+    
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._init()
+        return cls._instance
+    
+    def _init(self):
+        self.is_rate_limited = False
+        self.rate_limit_until = None
+        self.backoff_seconds = 60  # Start with 1 minute
+        self.max_backoff = 3600  # Max 1 hour
+        self.last_request_time = 0
+        self.min_request_interval = 1.0  # Minimum 1 second between requests
+    
+    def can_make_request(self) -> bool:
+        """Check if we can make a request to Steam API."""
+        if self.is_rate_limited:
+            if datetime.utcnow() < self.rate_limit_until:
+                return False
+            # Rate limit period expired, reset
+            self.is_rate_limited = False
+            self.backoff_seconds = 60  # Reset backoff
+        return True
+    
+    def wait_if_needed(self):
+        """Wait if we need to respect rate limits."""
+        # Check global rate limit
+        if self.is_rate_limited and self.rate_limit_until:
+            wait_time = (self.rate_limit_until - datetime.utcnow()).total_seconds()
+            if wait_time > 0:
+                print(f"Steam API rate limited. Waiting {wait_time:.0f} seconds...")
+                return False
+        
+        # Ensure minimum interval between requests
+        now = time.time()
+        elapsed = now - self.last_request_time
+        if elapsed < self.min_request_interval:
+            time.sleep(self.min_request_interval - elapsed)
+        
+        self.last_request_time = time.time()
+        return True
+    
+    def handle_response(self, response) -> bool:
+        """
+        Handle response from Steam API.
+        Returns True if request was successful, False if rate limited.
+        """
+        if response.status_code == 429:
+            self.is_rate_limited = True
+            self.rate_limit_until = datetime.utcnow() + timedelta(seconds=self.backoff_seconds)
+            print(f"Steam API 429 rate limit hit. Backing off for {self.backoff_seconds} seconds.")
+            # Exponential backoff for next time
+            self.backoff_seconds = min(self.backoff_seconds * 2, self.max_backoff)
+            return False
+        elif response.status_code == 200:
+            # Successful request, we can reduce backoff
+            self.backoff_seconds = max(60, self.backoff_seconds // 2)
+            return True
+        return True  # Other status codes don't trigger rate limiting
+    
+    def get_status(self) -> dict:
+        """Get current rate limiter status."""
+        return {
+            'is_rate_limited': self.is_rate_limited,
+            'rate_limit_until': self.rate_limit_until.isoformat() if self.rate_limit_until else None,
+            'current_backoff_seconds': self.backoff_seconds
+        }
+
+
+# Global rate limiter instance
+steam_rate_limiter = SteamRateLimiter()
+
+
+def log_deal_history(game, force=False):
+    """
+    Log a deal history entry if the price has changed from the last recorded entry.
+    
+    Args:
+        game: The Game object to log history for
+        force: If True, always log even if price hasn't changed
+    """
+    try:
+        # Get the most recent history entry for this game
+        last_entry = DealHistory.query.filter_by(game_id=game.id)\
+            .order_by(DealHistory.recorded_at.desc()).first()
+        
+        # Check if price has changed
+        price_changed = (
+            force or
+            last_entry is None or
+            abs((last_entry.price or 0) - (game.price or 0)) > 0.01 or
+            (last_entry.discount or 0) != (game.discount or 0) or
+            last_entry.is_active != game.is_active
+        )
+        
+        if price_changed:
+            history = DealHistory(
+                game_id=game.id,
+                price=game.price,
+                original_price=game.original_price,
+                discount=game.discount or 0,
+                is_active=game.is_active if game.is_active is not None else True
+            )
+            db.session.add(history)
+            db.session.commit()
+            return True
+        return False
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error logging deal history for game {game.id}: {e}")
+        return False
 
 def parse_requirements(req_html):
     """
@@ -575,6 +699,9 @@ def save_cheapshark_deal(deal):
             game.deal_last_verified = datetime.utcnow()
             db.session.add(game)
             db.session.commit()
+            
+            # Log deal history if price changed
+            log_deal_history(game)
             return True
             
         return False
@@ -587,11 +714,32 @@ def save_cheapshark_deal(deal):
 def verify_deal_on_steam(steam_id):
     """
     Check Steam's API to verify if a game is still on sale.
-    Returns tuple: (is_on_sale, current_price, original_price, discount_percent) or None if error
+    Returns dict with deal info or None if error/rate limited.
+    
+    Returns:
+        {
+            'is_on_sale': bool,
+            'price': float,
+            'original_price': float,
+            'discount': int,
+            'deal_ends_at': datetime or None
+        }
     """
+    # Check rate limiter first
+    if not steam_rate_limiter.can_make_request():
+        print(f"Steam API rate limited, skipping verification for {steam_id}")
+        return None
+    
+    if not steam_rate_limiter.wait_if_needed():
+        return None
+    
     try:
         url = f"https://store.steampowered.com/api/appdetails?appids={steam_id}&cc=us"
         response = requests.get(url, timeout=10)
+        
+        # Handle rate limiting
+        if not steam_rate_limiter.handle_response(response):
+            return None
         
         if response.status_code != 200:
             return None
@@ -615,10 +763,35 @@ def verify_deal_on_steam(steam_id):
         
         is_on_sale = discount > 0
         
-        return (is_on_sale, final_price, initial_price, discount)
+        # Try to get deal end date from package groups
+        deal_ends_at = None
+        package_groups = game_data.get('package_groups', [])
+        for pkg_group in package_groups:
+            subs = pkg_group.get('subs', [])
+            for sub in subs:
+                # Steam provides discount_end_rtime as Unix timestamp
+                discount_end = sub.get('discount_end_rtime')
+                if discount_end and discount_end > 0:
+                    deal_ends_at = datetime.utcfromtimestamp(discount_end)
+                    break
+            if deal_ends_at:
+                break
+        
+        return {
+            'is_on_sale': is_on_sale,
+            'price': final_price,
+            'original_price': initial_price,
+            'discount': discount,
+            'deal_ends_at': deal_ends_at
+        }
     except Exception as e:
         print(f"Error verifying deal on Steam for {steam_id}: {e}")
         return None
+
+
+def get_steam_rate_limiter_status():
+    """Get current status of the Steam rate limiter."""
+    return steam_rate_limiter.get_status()
 
 
 def verify_and_update_stale_deals(hours_threshold=24, batch_size=10):
@@ -631,6 +804,11 @@ def verify_and_update_stale_deals(hours_threshold=24, batch_size=10):
         batch_size: Number of deals to verify per run (to avoid rate limiting)
     """
     try:
+        # Check if we're rate limited before even starting
+        if not steam_rate_limiter.can_make_request():
+            print("Steam API rate limited, skipping stale deal verification")
+            return 0
+        
         cutoff_time = datetime.utcnow() - timedelta(hours=hours_threshold)
         
         # Find active deals that haven't been verified recently
@@ -649,39 +827,59 @@ def verify_and_update_stale_deals(hours_threshold=24, batch_size=10):
         deactivated_count = 0
         
         for game in stale_deals:
+            # Check rate limit before each request
+            if not steam_rate_limiter.can_make_request():
+                print("Hit rate limit during verification, stopping batch")
+                break
+            
             if not game.steam_id:
                 continue
                 
             result = verify_deal_on_steam(game.steam_id)
             
             if result is None:
-                # Couldn't verify, just update verification time to try again later
+                # Couldn't verify (rate limited or error), just update verification time to try again later
                 game.deal_last_verified = datetime.utcnow()
                 continue
-                
-            is_on_sale, current_price, original_price, discount = result
+            
+            price_changed = False
+            is_on_sale = result['is_on_sale']
+            current_price = result['price']
+            original_price = result['original_price']
+            discount = result['discount']
+            deal_ends_at = result.get('deal_ends_at')
             
             if is_on_sale:
                 # Deal is still active - update price info if changed
                 if abs((game.price or 0) - current_price) > 0.01:
                     game.price = current_price
                     updated_count += 1
+                    price_changed = True
                 if abs((game.original_price or 0) - original_price) > 0.01:
                     game.original_price = original_price
+                    price_changed = True
                 if game.discount != discount:
                     game.discount = discount
+                    price_changed = True
+                # Update deal end date if we got one
+                if deal_ends_at:
+                    game.deal_ends_at = deal_ends_at
                 game.deal_last_verified = datetime.utcnow()
             else:
                 # Deal has expired - mark as inactive but keep the game info
                 game.is_active = False
                 game.discount = 0
                 game.price = game.original_price  # Reset to original price
+                game.deal_ends_at = None  # Clear the end date
                 game.deal_last_verified = datetime.utcnow()
                 deactivated_count += 1
+                price_changed = True
                 print(f"Deal expired: {game.title} (Steam ID: {game.steam_id})")
             
-            # Rate limiting - be nice to Steam's API
-            time.sleep(1)
+            # Log deal history if anything changed
+            if price_changed:
+                db.session.flush()  # Make sure game has latest values
+                log_deal_history(game)
         
         db.session.commit()
         

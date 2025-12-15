@@ -47,6 +47,38 @@ for db_file in db_files:
                 print("  Column added successfully!")
             else:
                 print("  deal_last_verified column already exists")
+            
+            # Add deal_ends_at if missing
+            if 'deal_ends_at' not in columns:
+                print("  Adding deal_ends_at column...")
+                cursor.execute("ALTER TABLE games ADD COLUMN deal_ends_at DATETIME")
+                conn.commit()
+                print("  Column added successfully!")
+            else:
+                print("  deal_ends_at column already exists")
+        
+        # Create deal_history table if it doesn't exist
+        if 'deal_history' not in tables:
+            print("  Creating deal_history table...")
+            cursor.execute("""
+                CREATE TABLE deal_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    game_id INTEGER NOT NULL,
+                    price REAL NOT NULL,
+                    original_price REAL,
+                    discount INTEGER DEFAULT 0,
+                    is_active BOOLEAN DEFAULT 1,
+                    recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (game_id) REFERENCES games(id)
+                )
+            """)
+            # Create index for faster queries
+            cursor.execute("CREATE INDEX idx_deal_history_game_id ON deal_history(game_id)")
+            cursor.execute("CREATE INDEX idx_deal_history_recorded_at ON deal_history(recorded_at)")
+            conn.commit()
+            print("  deal_history table created successfully!")
+        else:
+            print("  deal_history table already exists")
         
         conn.close()
     else:

@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 import math
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from services.steam_service import (
     get_steam_featured,
     save_game_to_db,
@@ -9,7 +9,7 @@ from services.steam_service import (
     fetch_cheapshark_deals,
     verify_deal_on_steam,
 )
-from models import Game, db
+from models import Game, DealHistory, db
 
 products_bp = Blueprint('products_bp', __name__)
 
@@ -1069,12 +1069,16 @@ def verify_game_in_background(game_id, app):
             result = verify_deal_on_steam(game.steam_id)
             
             if result is None:
-                # Couldn't verify, just update verification time
+                # Couldn't verify (rate limited or error), just update verification time
                 game.deal_last_verified = datetime.utcnow()
                 db.session.commit()
                 return
-                
-            is_on_sale, current_price, original_price, discount = result
+            
+            is_on_sale = result['is_on_sale']
+            current_price = result['price']
+            original_price = result['original_price']
+            discount = result['discount']
+            deal_ends_at = result.get('deal_ends_at')
             
             if is_on_sale:
                 # Update price info if changed
@@ -1084,16 +1088,22 @@ def verify_game_in_background(game_id, app):
                     game.original_price = original_price
                 if game.discount != discount:
                     game.discount = discount
+                # Update deal end date if available
+                if deal_ends_at:
+                    game.deal_ends_at = deal_ends_at
                 game.is_active = True
             else:
                 # Deal has expired
                 game.is_active = False
                 game.discount = 0
                 game.price = game.original_price
+                game.deal_ends_at = None
                 
             game.deal_last_verified = datetime.utcnow()
             db.session.commit()
-            print(f"Verified deal for {game.title}: on_sale={is_on_sale}, discount={discount}%")
+            
+            end_info = f", ends={deal_ends_at}" if deal_ends_at else ""
+            print(f"Verified deal for {game.title}: on_sale={is_on_sale}, discount={discount}%{end_info}")
         except Exception as e:
             print(f"Error verifying game {game_id}: {e}")
 
@@ -1126,6 +1136,85 @@ def verify_product(product_id):
     thread.start()
     
     return jsonify({"message": "Verification started"}), 202
+
+
+@products_bp.route('/api/products/<int:product_id>/history')
+def get_product_history(product_id):
+    """
+    Get the price history for a game.
+    
+    Query params:
+        - start_date: ISO format date (optional, default: 30 days ago)
+        - end_date: ISO format date (optional, default: now)
+    """
+    # Only games have history
+    game = Game.query.get(product_id)
+    if not game:
+        return jsonify({"error": "Product not found"}), 404
+    
+    # Parse date range
+    try:
+        end_date_str = request.args.get('end_date')
+        start_date_str = request.args.get('start_date')
+        
+        if end_date_str:
+            end_date = datetime.fromisoformat(end_date_str.replace('Z', '+00:00'))
+        else:
+            end_date = datetime.utcnow()
+            
+        if start_date_str:
+            start_date = datetime.fromisoformat(start_date_str.replace('Z', '+00:00'))
+        else:
+            start_date = end_date - timedelta(days=30)
+    except ValueError as e:
+        return jsonify({"error": f"Invalid date format: {e}"}), 400
+    
+    # Query history
+    history = DealHistory.query.filter(
+        DealHistory.game_id == product_id,
+        DealHistory.recorded_at >= start_date,
+        DealHistory.recorded_at <= end_date
+    ).order_by(DealHistory.recorded_at.asc()).all()
+    
+    # Calculate stats
+    if history:
+        prices = [h.price for h in history if h.price is not None]
+        discounts = [h.discount for h in history if h.discount is not None]
+        savings = [(h.original_price or 0) - (h.price or 0) for h in history]
+        
+        stats = {
+            'minPrice': min(prices) if prices else None,
+            'maxPrice': max(prices) if prices else None,
+            'avgPrice': round(sum(prices) / len(prices), 2) if prices else None,
+            'maxDiscount': max(discounts) if discounts else 0,
+            'avgDiscount': round(sum(discounts) / len(discounts), 1) if discounts else 0,
+            'maxSavings': max(savings) if savings else 0,
+            'totalRecords': len(history)
+        }
+    else:
+        stats = {
+            'minPrice': None,
+            'maxPrice': None,
+            'avgPrice': None,
+            'maxDiscount': 0,
+            'avgDiscount': 0,
+            'maxSavings': 0,
+            'totalRecords': 0
+        }
+    
+    return jsonify({
+        'gameId': product_id,
+        'gameTitle': game.title,
+        'currentPrice': game.price,
+        'originalPrice': game.original_price,
+        'currentDiscount': game.discount,
+        'history': [h.to_dict() for h in history],
+        'stats': stats,
+        'dateRange': {
+            'start': start_date.isoformat(),
+            'end': end_date.isoformat()
+        }
+    })
 
 
 
