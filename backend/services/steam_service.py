@@ -723,11 +723,39 @@ def save_cheapshark_deal(deal):
             game.deal_last_verified = datetime.utcnow()
             db.session.add(game)
             db.session.commit()
-            
+
             # Log deal history if price changed
             log_deal_history(game)
+
             return True
-            
+
+        # --- Force a DealHistory entry at sale start if missing ---
+        # CheapShark provides 'lastChange' (unix epoch) for sale start
+        # This runs for ALL active deals with discount, even if no changes
+        sale_start_epoch = deal.get('lastChange') or deal.get('lastChangeTime')
+        if sale_start_epoch and game.is_active and game.discount > 0:
+            sale_start = datetime.utcfromtimestamp(int(sale_start_epoch))
+            # Check if a DealHistory entry exists at or after sale_start
+            existing = DealHistory.query.filter(
+                DealHistory.game_id == game.id,
+                DealHistory.recorded_at >= sale_start
+            ).first()
+            if not existing:
+                try:
+                    history = DealHistory(
+                        game_id=game.id,
+                        price=game.price,
+                        original_price=game.original_price,
+                        discount=game.discount or 0,
+                        is_active=True,
+                        recorded_at=sale_start
+                    )
+                    db.session.add(history)
+                    db.session.commit()
+                except Exception as e:
+                    db.session.rollback()
+                    print(f"Error logging forced sale start history for game {game.id}: {e}")
+
         return False
     except Exception as e:
         db.session.rollback()

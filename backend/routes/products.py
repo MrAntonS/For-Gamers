@@ -1102,6 +1102,56 @@ def verify_game_in_background(game_id, app):
             game.deal_last_verified = datetime.utcnow()
             db.session.commit()
             
+            # Ensure DealHistory reflects discount start and end times
+            sale_start = getattr(game, 'deal_started_at', None)
+            if sale_start:
+                # If stored as epoch, convert to datetime (assume UTC)
+                if isinstance(sale_start, (int, float)):
+                    sale_start = datetime.utcfromtimestamp(int(sale_start))
+
+                # Check for existing start entry
+                start_entry = DealHistory.query.filter(
+                    DealHistory.game_id == game.id,
+                    DealHistory.recorded_at == sale_start
+                ).first()
+                if not start_entry:
+                    try:
+                        start_history = DealHistory(
+                            game_id=game.id,
+                            price=game.price,
+                            original_price=game.original_price,
+                            discount=game.discount,
+                            is_active=True,
+                            recorded_at=sale_start
+                        )
+                        db.session.add(start_history)
+                        db.session.commit()
+                    except Exception as e:
+                        db.session.rollback()
+                        print(f"Error adding discount start history for game {game.id}: {e}")
+
+            # Check for existing end entry (if discount ends)
+            if game.discount == 0:
+                end_entry = DealHistory.query.filter(
+                    DealHistory.game_id == game.id,
+                    DealHistory.is_active == False
+                ).first()
+                if not end_entry:
+                    try:
+                        end_history = DealHistory(
+                            game_id=game.id,
+                            price=game.price,
+                            original_price=game.original_price,
+                            discount=0,
+                            is_active=False,
+                            recorded_at=datetime.utcnow()
+                        )
+                        db.session.add(end_history)
+                        db.session.commit()
+                    except Exception as e:
+                        db.session.rollback()
+                        print(f"Error adding discount end history for game {game.id}: {e}")
+            
             end_info = f", ends={deal_ends_at}" if deal_ends_at else ""
             print(f"Verified deal for {game.title}: on_sale={is_on_sale}, discount={discount}%{end_info}")
         except Exception as e:
@@ -1201,6 +1251,46 @@ def get_product_history(product_id):
             'maxSavings': 0,
             'totalRecords': 0
         }
+    
+    # Ensure no duplicate DealHistory entries exist
+    duplicates = DealHistory.query.filter(
+        DealHistory.game_id == game.id,
+        DealHistory.price == game.price,
+        DealHistory.discount == game.discount,
+        DealHistory.recorded_at >= datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    ).all()
+    if len(duplicates) > 1:
+        try:
+            # Keep only the first entry and delete the rest
+            for duplicate in duplicates[1:]:
+                db.session.delete(duplicate)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error removing duplicate deal history for game {game.id}: {e}")
+
+    # Ensure current deal is in history
+    existing = DealHistory.query.filter(
+        DealHistory.game_id == game.id,
+        DealHistory.price == game.price,
+        DealHistory.discount == game.discount,
+        DealHistory.recorded_at >= datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    ).first()
+    if not existing:
+        try:
+            history_entry = DealHistory(
+                game_id=game.id,
+                price=game.price,
+                original_price=game.original_price,
+                discount=game.discount,
+                is_active=True,
+                recorded_at=datetime.utcnow()
+            )
+            db.session.add(history_entry)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error ensuring deal history for game {game.id}: {e}")
     
     return jsonify({
         'gameId': product_id,

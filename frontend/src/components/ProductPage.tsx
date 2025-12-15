@@ -371,13 +371,6 @@ const ProductPage: React.FC = () => {
         {product.category === 'Game' && product.pc_requirements && (
           <SystemRequirements requirements={product.pc_requirements} />
         )}
-
-        {/* Deal History Chart (for games) */}
-        {product.category === 'Game' && (
-          <div className="mt-12 border-t border-gray-800 pt-8">
-            <DealHistoryChart gameId={product.id} />
-          </div>
-        )}
       </div>
     </div>
   );
