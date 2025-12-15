@@ -91,18 +91,26 @@ def create_app():
     # Configure Database
     database_url = os.environ.get('DATABASE_URL')
     if not database_url:
-        # Fallback to constructing from components (safer for passwords with special chars)
-        db_user = os.environ.get('POSTGRES_USER', 'postgres')
-        db_pass = os.environ.get('POSTGRES_PASSWORD', 'postgres')
-        db_host = os.environ.get('POSTGRES_HOST', 'db')
-        db_port = os.environ.get('POSTGRES_PORT', '5432')
-        db_name = os.environ.get('POSTGRES_DB', 'gamernexus')
-        
-        if db_pass:
-            import urllib.parse
-            db_pass = urllib.parse.quote_plus(db_pass)
-            
-        database_url = f"postgresql://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
+        # Prefer Postgres only when the host is explicitly configured (e.g. docker-compose sets POSTGRES_HOST=db).
+        # Otherwise default to a lightweight local SQLite DB for easy local development.
+        postgres_host = os.environ.get('POSTGRES_HOST')
+        if not postgres_host:
+            os.makedirs(app.instance_path, exist_ok=True)
+            sqlite_path = os.path.join(app.instance_path, 'local.db')
+            database_url = f"sqlite:///{sqlite_path}"
+        else:
+            # Construct Postgres URL from components (safer for passwords with special chars)
+            db_user = os.environ.get('POSTGRES_USER', 'postgres')
+            db_pass = os.environ.get('POSTGRES_PASSWORD', 'postgres')
+            db_host = postgres_host
+            db_port = os.environ.get('POSTGRES_PORT', '5432')
+            db_name = os.environ.get('POSTGRES_DB', 'gamernexus')
+
+            if db_pass:
+                import urllib.parse
+                db_pass = urllib.parse.quote_plus(db_pass)
+
+            database_url = f"postgresql://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
 
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -149,9 +157,16 @@ def create_app():
         app.register_blueprint(minmax.minmax_bp)
         app.register_blueprint(auth.auth_bp)
         app.register_blueprint(external.external_bp)
-# Start background thread
-    # Check if we are in the main process (not reloader) or if debug is off
-    if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+
+    # Start background thread
+    # When Flask debug reloader is on, only start the background thread in the
+    # reloader's main process to avoid running it twice.
+    debug_mode = (
+        os.environ.get("FLASK_DEBUG", "").lower() in ("1", "true", "yes", "on")
+        or os.environ.get("FLASK_ENV") == "development"
+    )
+
+    if (not debug_mode) or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         # Check if thread is already running to avoid duplicates in same process
         is_running = False
         for t in threading.enumerate():
@@ -200,7 +215,5 @@ def background_task(app):
             time.sleep(600)
 
 if __name__ == "__main__":
-    app = create_appn = True
-    thread.start()
-    
+    app = create_app()
     app.run(debug=True, host='0.0.0.0', port=5000)

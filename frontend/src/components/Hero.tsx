@@ -78,8 +78,8 @@ const Hero = () => {
       <ArcCarousel items={hardwareDeals} side="right" fallbackImage="/hardware-placeholder.png" />
 
       {/* Content */}
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pointer-events-none">
-        <div className="text-center pointer-events-auto">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pointer-events-none flex justify-center">
+        <div className="text-center pointer-events-auto max-w-2xl lg:max-w-3xl xl:max-w-4xl">
           <h1 className="text-4xl tracking-tight font-extrabold text-white sm:text-5xl md:text-6xl drop-shadow-lg">
             <span className="block">Level Up Your</span>
             <span className="block text-red-600">Gaming Experience</span>

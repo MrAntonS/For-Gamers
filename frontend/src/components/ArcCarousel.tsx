@@ -21,16 +21,42 @@ interface ArcCarouselProps {
 const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage }) => {
   const [scrollProgress, setScrollProgress] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
+  const [dimensions, setDimensions] = useState({ 
+    radiusX: 250, 
+    radiusY: 500,
+    cardWidth: 240,
+    cardHeight: 350
+  });
+
   const containerRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef<number>(0);
   const lastScrollTime = useRef<number>(0);
 
   // Configuration
   const VISIBLE_ITEMS = 6; 
-  const RADIUS_X = 250; 
-  const RADIUS_Y = 500; 
   
   const totalItems = items.length;
+
+  // Responsive dimensions
+  useEffect(() => {
+    const handleResize = () => {
+      const h = window.innerHeight;
+      // Scale down for smaller screens
+      // Base height reference: 900px
+      const scaleFactor = Math.min(1, Math.max(0.6, h / 900)); 
+      
+      setDimensions({
+        radiusX: 250 * scaleFactor,
+        radiusY: h * 0.4, // Dynamic Y radius based on viewport height
+        cardWidth: 240 * scaleFactor,
+        cardHeight: 350 * scaleFactor
+      });
+    };
+    
+    window.addEventListener('resize', handleResize);
+    handleResize();
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   // Auto-scroll
   useEffect(() => {
@@ -97,8 +123,8 @@ const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage })
     const angle = offset * (angleSpread / (VISIBLE_ITEMS / 2));
     
     // Calculate position
-    const y = Math.sin(angle) * RADIUS_Y;
-    const xOffset = Math.cos(angle) * RADIUS_X;
+    const y = Math.sin(angle) * dimensions.radiusY;
+    const xOffset = Math.cos(angle) * dimensions.radiusX;
     
     let x, rotate;
     
@@ -108,12 +134,12 @@ const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage })
         // At angle 0 (center), x should be max (closest to screen center).
         // x = -RADIUS_X + xOffset.
         // We want to shift it so it's visible.
-        x = -RADIUS_X + xOffset + 20; 
+        x = -dimensions.radiusX + xOffset + 20; 
         rotate = angle * (180 / Math.PI) * 0.3;
     } else {
         // Arc bows left (
         // Center is to the right.
-        x = RADIUS_X - xOffset - 20;
+        x = dimensions.radiusX - xOffset - 20;
         rotate = -angle * (180 / Math.PI) * 0.3;
     }
 
@@ -148,8 +174,8 @@ const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage })
           <div key={item.id} style={getItemStyle(index)} className="will-change-transform">
              <ProductCard
                 {...item}
-                width="240px"
-                height="350px"
+                width={`${dimensions.cardWidth}px`}
+                height={`${dimensions.cardHeight}px`}
                 className="shadow-2xl"
                 enableHoverReveal={true}
                 fallbackImage={fallbackImage}

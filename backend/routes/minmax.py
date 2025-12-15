@@ -3,6 +3,7 @@ from models import Game, db
 from services.hardware_matcher import HardwareMatcher
 import json
 import re
+from sqlalchemy import func
 
 minmax_bp = Blueprint('minmax_bp', __name__)
 
@@ -39,16 +40,19 @@ def _parse_ram_gb(text):
 @minmax_bp.route('/api/minmax/games', methods=['GET'])
 def get_games():
     # Fetch games that have requirements.
-    # Support optional pagination: ?limit=500&offset=0
-    # Default limit is high enough to include all requirement-bearing games in typical DBs.
+    # Supports pagination and server-side search:
+    #   ?limit=60&offset=0&q=elden
+    # This endpoint intentionally returns a lightweight payload for scrolling lists.
     try:
-        limit = int(request.args.get('limit', 1000))
+        limit = int(request.args.get('limit', 20))
     except Exception:
-        limit = 1000
+        limit = 20
     try:
         offset = int(request.args.get('offset', 0))
     except Exception:
         offset = 0
+
+    q = (request.args.get('q') or '').strip()
 
     if limit < 1:
         limit = 1
@@ -57,59 +61,74 @@ def get_games():
     if offset < 0:
         offset = 0
 
+    query = Game.query.filter(Game.pc_requirements.isnot(None))
+    if q:
+        query = query.filter(Game.title.ilike(f"%{q}%"))
+
     games = (
-        Game.query
-        .filter(Game.pc_requirements.isnot(None))
+        query
         .order_by(Game.title.asc())
         .offset(offset)
         .limit(limit)
         .all()
     )
-    
-    result = []
-    for game in games:
-        try:
-            reqs = json.loads(game.pc_requirements) if game.pc_requirements else {}
-            if not isinstance(reqs, dict):
-                reqs = {}
-        except:
-            reqs = {}
-            
-        # Use recommended if available, otherwise minimum
-        rec = reqs.get('recommended')
-        if not isinstance(rec, dict):
-            rec = reqs.get('minimum')
-        
-        if not isinstance(rec, dict):
-            rec = {}
-        
-        gpu_text = rec.get('graphics', '')
-        cpu_text = rec.get('processor', '')
-        mem_text = rec.get('memory', '')
-        
-        gpu_score, gpu_name = HardwareMatcher.extract_score(gpu_text, 'gpu')
-        cpu_score, cpu_name = HardwareMatcher.extract_score(cpu_text, 'cpu')
-        
-        # Simple memory parsing
-        mem_score = 0
-        if '16' in mem_text: mem_score = 16
-        elif '8' in mem_text: mem_score = 8
-        elif '4' in mem_text: mem_score = 4
-        
-        result.append({
+
+    # Lightweight payload for list rendering
+    result = [
+        {
             'id': game.id,
             'name': game.title,
-            'category': 'Game', 
             'image': game.image_url,
-            'recommended_gpu': gpu_name or 'Unknown GPU',
-            'gpu_score': gpu_score,
-            'recommended_cpu': cpu_name or 'Unknown CPU',
-            'cpu_score': cpu_score,
-            'recommended_memory': mem_text,
-            'memory_score': mem_score
-        })
-        
+        }
+        for game in games
+    ]
     return jsonify(result)
+
+
+@minmax_bp.route('/api/minmax/games/exists', methods=['GET'])
+def game_exists():
+    """Check whether a game exists in the DB (by name).
+
+    Query params:
+      - q: game name to search
+    Returns:
+      {"exists": bool, "game": {"id","name","image"} | null}
+    """
+    q = (request.args.get('q') or '').strip()
+    if not q:
+        return jsonify({'exists': False, 'game': None})
+
+    q_lower = q.lower()
+
+    # Prefer exact title match (case-insensitive)
+    game = (
+        Game.query
+        .filter(Game.pc_requirements.isnot(None))
+        .filter(func.lower(Game.title) == q_lower)
+        .first()
+    )
+
+    # Fallback: best-effort partial match
+    if not game:
+        game = (
+            Game.query
+            .filter(Game.pc_requirements.isnot(None))
+            .filter(Game.title.ilike(f"%{q}%"))
+            .order_by(Game.title.asc())
+            .first()
+        )
+
+    if not game:
+        return jsonify({'exists': False, 'game': None})
+
+    return jsonify({
+        'exists': True,
+        'game': {
+            'id': game.id,
+            'name': game.title,
+            'image': game.image_url,
+        }
+    })
 
 @minmax_bp.route('/api/minmax/calculate', methods=['POST'])
 def calculate_build():
