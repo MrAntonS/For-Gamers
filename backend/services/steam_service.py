@@ -222,6 +222,11 @@ def update_game_details_systematically(limit=5):
     """
     Find games with missing details (e.g. description or requirements) and fetch them.
     """
+    # Check if we're rate limited before starting
+    if not steam_rate_limiter.can_make_request():
+        print("Steam API rate limited, skipping game details update")
+        return 0
+    
     # Update games that are missing description OR missing pc_requirements OR have raw HTML in requirements
     games_needing_update = Game.query.filter(
         (Game.description == None) | (Game.description == '') | 
@@ -232,6 +237,11 @@ def update_game_details_systematically(limit=5):
     
     updated_count = 0
     for game in games_needing_update:
+        # Check rate limit before each request
+        if not steam_rate_limiter.can_make_request():
+            print("Hit rate limit during details update, stopping batch")
+            break
+        
         try:
             details = get_steam_game_details(game.steam_id)
             if details:
@@ -448,7 +458,16 @@ def search_steam_games(query):
 def get_steam_game_details(app_id):
     """
     Get details for a specific game using the Storefront API.
+    Uses rate limiter to avoid 429 errors.
     """
+    # Check rate limiter first
+    if not steam_rate_limiter.can_make_request():
+        print(f"Steam API rate limited, skipping details fetch for {app_id}")
+        return {}
+    
+    if not steam_rate_limiter.wait_if_needed():
+        return {}
+    
     url = "https://store.steampowered.com/api/appdetails"
     params = {
         "appids": app_id,
@@ -456,7 +475,12 @@ def get_steam_game_details(app_id):
     }
     
     try:
-        response = requests.get(url, params=params)
+        response = requests.get(url, params=params, timeout=10)
+        
+        # Handle rate limiting
+        if not steam_rate_limiter.handle_response(response):
+            return {}
+        
         response.raise_for_status()
         data = response.json()
         
@@ -776,7 +800,44 @@ def verify_deal_on_steam(steam_id):
                     break
             if deal_ends_at:
                 break
-        
+
+        # Fallback: If no deal_ends_at from API, try parsing from HTML (all editions)
+        if deal_ends_at is None and is_on_sale:
+            try:
+                html_url = f"https://store.steampowered.com/app/{steam_id}/"
+                headers = {"User-Agent": "Mozilla/5.0"}
+                html_resp = requests.get(html_url, headers=headers, timeout=10)
+                if html_resp.status_code == 200:
+                    soup = BeautifulSoup(html_resp.text, 'html.parser')
+                    countdowns = soup.find_all('p', class_='game_purchase_discount_countdown')
+                    import re
+                    import calendar
+                    now = datetime.utcnow()
+                    earliest = None
+                    for countdown in countdowns:
+                        text = countdown.get_text(strip=True)
+                        match = re.search(r'Offer ends ([A-Za-z]+) (\d{1,2})', text)
+                        if match:
+                            month_str = match.group(1)
+                            day = int(match.group(2))
+                            year = now.year
+                            try:
+                                month = list(calendar.month_name).index(month_str)
+                            except ValueError:
+                                continue
+                            try:
+                                deal_ends = datetime(year, month, day)
+                                if deal_ends < now:
+                                    deal_ends = datetime(year + 1, month, day)
+                                if earliest is None or deal_ends < earliest:
+                                    earliest = deal_ends
+                            except Exception:
+                                continue
+                    if earliest:
+                        deal_ends_at = earliest
+            except Exception as e:
+                print(f"Error parsing deal end date from HTML for {steam_id}: {e}")
+
         return {
             'is_on_sale': is_on_sale,
             'price': final_price,

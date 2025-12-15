@@ -175,15 +175,50 @@ def create_app():
                 break
         
         if not is_running:
-            bg_thread = threading.Thread(target=background_task, args=(app,), name="BackgroundSteamFetch")
-            bg_thread.daemon = True
-            bg_thread.start()
+            # Use file-based lock to prevent multiple processes from starting the task
+            # This handles Gunicorn workers or multiple Flask processes
+            lock_file = os.path.join(app.instance_path, '.background_task.lock')
+            
+            try:
+                # Try to acquire lock (non-blocking)
+                import fcntl
+                lock_fd = open(lock_file, 'w')
+                fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                
+                # We got the lock, start the thread
+                bg_thread = threading.Thread(
+                    target=background_task, 
+                    args=(app, lock_fd), 
+                    name="BackgroundSteamFetch"
+                )
+                bg_thread.daemon = True
+                bg_thread.start()
+                print("Background Steam fetch thread started (acquired lock)")
+            except (IOError, OSError, ImportError):
+                # fcntl not available (Windows) or lock already held
+                # On Windows, use a simpler approach with a PID file
+                try:
+                    import msvcrt
+                    lock_fd = open(lock_file, 'w')
+                    msvcrt.locking(lock_fd.fileno(), msvcrt.LK_NBLCK, 1)
+                    
+                    bg_thread = threading.Thread(
+                        target=background_task, 
+                        args=(app, lock_fd), 
+                        name="BackgroundSteamFetch"
+                    )
+                    bg_thread.daemon = True
+                    bg_thread.start()
+                    print("Background Steam fetch thread started (acquired lock - Windows)")
+                except (IOError, OSError, ImportError):
+                    print("Background task already running in another process, skipping")
 
     return app
 
-def background_task(app):
+def background_task(app, lock_fd=None):
     """
     Background task to continuously fetch games from Steam.
+    Holds a file lock to ensure only one instance runs across processes.
     """
     import time
     from services.steam_service import (
@@ -193,45 +228,54 @@ def background_task(app):
         reactivate_deals_from_cheapshark
     )
     
-    with app.app_context():
-        first_run = True
-        run_count = 0
-        while True:
-            print("Running background Steam fetch...")
-            
-            # Fetch more pages on first run to populate DB
-            pages = 50 if first_run else 5
-            
-            # 1. Fetch deals from CheapShark (this will also reactivate any deals that come back)
-            try:
-                fetch_cheapshark_deals(pages=pages)
-            except Exception as e:
-                print(f"Error in CheapShark fetch: {e}")
-
-            # 2. Update details for games that miss them
-            try:
-                update_game_details_systematically(limit=50)
-            except Exception as e:
-                print(f"Error in Steam details update: {e}")
-            
-            # 3. Verify stale deals directly on Steam (check 10 deals per run)
-            # This catches deals that expired between CheapShark updates
-            try:
-                verify_and_update_stale_deals(hours_threshold=12, batch_size=10)
-            except Exception as e:
-                print(f"Error verifying stale deals: {e}")
-            
-            # 4. Every 6th run (~1 hour), check if any inactive games have new deals
-            run_count += 1
-            if run_count % 6 == 0:
+    # Keep lock_fd open to maintain the lock
+    try:
+        with app.app_context():
+            first_run = True
+            run_count = 0
+            while True:
+                print("Running background Steam fetch...")
+                
+                # Fetch more pages on first run to populate DB
+                pages = 50 if first_run else 5
+                
+                # 1. Fetch deals from CheapShark (this will also reactivate any deals that come back)
                 try:
-                    reactivate_deals_from_cheapshark()
+                    fetch_cheapshark_deals(pages=pages)
                 except Exception as e:
-                    print(f"Error reactivating deals: {e}")
-            
-            first_run = False
-            # Sleep for 10 minutes
-            time.sleep(600)
+                    print(f"Error in CheapShark fetch: {e}")
+
+                # 2. Update details for games that miss them
+                try:
+                    update_game_details_systematically(limit=50)
+                except Exception as e:
+                    print(f"Error in Steam details update: {e}")
+                
+                # 3. Verify stale deals directly on Steam (check 10 deals per run)
+                # This catches deals that expired between CheapShark updates
+                try:
+                    verify_and_update_stale_deals(hours_threshold=12, batch_size=10)
+                except Exception as e:
+                    print(f"Error verifying stale deals: {e}")
+                
+                # 4. Every 6th run (~1 hour), check if any inactive games have new deals
+                run_count += 1
+                if run_count % 6 == 0:
+                    try:
+                        reactivate_deals_from_cheapshark()
+                    except Exception as e:
+                        print(f"Error reactivating deals: {e}")
+                
+                first_run = False
+                # Sleep for 10 minutes
+                time.sleep(600)
+    finally:
+        # Release lock on exit
+        if lock_fd:
+            try:
+                lock_fd.close()
+            except:
+                pass
 
 if __name__ == "__main__":
     app = create_app()
