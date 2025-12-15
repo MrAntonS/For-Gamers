@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { API_BASE_URL } from '../config';
 import { FaMicrochip, FaMemory, FaDesktop, FaSearch, FaTimes, FaArrowLeft, FaCheck } from 'react-icons/fa';
 
@@ -51,52 +51,103 @@ type SetupMode = 'minimal' | 'recommended';
 
 const MinMaxTab = () => {
   const [games, setGames] = useState<Game[]>([]);
-  const [selectedGameIds, setSelectedGameIds] = useState<number[]>([]);
+  const [selectedGames, setSelectedGames] = useState<Game[]>([]);
   const [recommendation, setRecommendation] = useState<RecommendationResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [gamesLoading, setGamesLoading] = useState(false);
+  const [hasMoreGames, setHasMoreGames] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [view, setView] = useState<'selection' | 'result'>('selection');
   const [activeIndex, setActiveIndex] = useState(0);
   const [setupMode, setSetupMode] = useState<SetupMode>('recommended');
+  const gamesContainerRef = useRef<HTMLDivElement>(null);
+  const GAMES_PER_PAGE = 60;
 
-  // Fetch games on component mount
-  useEffect(() => {
-    const fetchGames = async () => {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/minmax/games`);
-        if (!response.ok) {
-          throw new Error(`Server error: ${response.status}`);
-        }
-        const data = await response.json();
-        setGames(data);
-      } catch (err) {
-        console.error('Error fetching games:', err);
-        if (err instanceof TypeError && err.message.includes('fetch')) {
-          setError('Unable to connect to the server. Please check your internet connection and try again.');
-        } else {
-          setError('Failed to load games. Please refresh the page or try again later.');
-        }
+  // Derived: set of selected game IDs for quick lookup
+  const selectedGameIds = new Set(selectedGames.map(g => g.id));
+
+  // Fetch games with pagination
+  const fetchGames = useCallback(async (offset: number = 0, search: string = '') => {
+    if (gamesLoading) return;
+    setGamesLoading(true);
+    
+    try {
+      const params = new URLSearchParams({
+        limit: GAMES_PER_PAGE.toString(),
+        offset: offset.toString(),
+      });
+      if (search) params.append('q', search);
+      
+      const response = await fetch(`${API_BASE_URL}/api/minmax/games?${params}`);
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
       }
-    };
+      const data = await response.json();
+      
+      if (offset === 0) {
+        setGames(data);
+      } else {
+        // Deduplicate when appending
+        setGames(prev => {
+          const existingIds = new Set(prev.map(g => g.id));
+          const newGames = data.filter((g: Game) => !existingIds.has(g.id));
+          return [...prev, ...newGames];
+        });
+      }
+      
+      setHasMoreGames(data.length === GAMES_PER_PAGE);
+    } catch (err) {
+      console.error('Error fetching games:', err);
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        setError('Unable to connect to the server. Please check your internet connection and try again.');
+      } else {
+        setError('Failed to load games. Please refresh the page or try again later.');
+      }
+    } finally {
+      setGamesLoading(false);
+    }
+  }, [gamesLoading]);
 
-    fetchGames();
+  // Initial fetch
+  useEffect(() => {
+    fetchGames(0, '');
   }, []);
 
+  // Search with debounce
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setHasMoreGames(true);
+      fetchGames(0, searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Infinite scroll handler
+  const handleScroll = useCallback(() => {
+    const container = gamesContainerRef.current;
+    if (!container || gamesLoading || !hasMoreGames) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    if (scrollTop + clientHeight >= scrollHeight - 200) {
+      fetchGames(games.length, searchTerm);
+    }
+  }, [gamesLoading, hasMoreGames, games.length, searchTerm, fetchGames]);
+
   // Handle game selection toggle
-  const toggleGameSelection = (gameId: number) => {
-    setSelectedGameIds(prev => {
-      if (prev.includes(gameId)) {
-        return prev.filter(id => id !== gameId);
+  const toggleGameSelection = (game: Game) => {
+    setSelectedGames(prev => {
+      if (prev.some(g => g.id === game.id)) {
+        return prev.filter(g => g.id !== game.id);
       } else {
-        return [...prev, gameId];
+        return [...prev, game];
       }
     });
   };
 
   // Get Recommendation
   const getRecommendation = async (idsOverride?: number[]) => {
-    const idsToUse = idsOverride || selectedGameIds;
+    const idsToUse = idsOverride || Array.from(selectedGameIds);
 
     if (idsToUse.length === 0) {
       setError('Please select at least one game');
@@ -134,8 +185,8 @@ const MinMaxTab = () => {
   };
 
   const handleDeleteGame = async (gameId: number) => {
-    const newIds = selectedGameIds.filter(id => id !== gameId);
-    setSelectedGameIds(newIds);
+    setSelectedGames(prev => prev.filter(g => g.id !== gameId));
+    const newIds = Array.from(selectedGameIds).filter(id => id !== gameId);
 
     if (newIds.length === 0) {
       setView('selection');
@@ -150,124 +201,90 @@ const MinMaxTab = () => {
     }
   };
 
-  const filteredGames = games.filter(game =>
-    game.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const selectedGamesList = games.filter(game => selectedGameIds.includes(game.id));
-
   if (view === 'selection') {
     return (
-      <div className="minmax-container" style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
-        <h2 style={{ fontSize: '2.5rem', marginBottom: '2rem', textAlign: 'center' }}>Build Your Perfect Setup</h2>
+      <div className="h-full flex flex-col p-4 md:p-8 max-w-[1400px] mx-auto w-full">
+        <h2 className="text-3xl md:text-4xl mb-6 text-center font-bold">Build Your Perfect Setup</h2>
 
         {error && (
-          <div style={{ backgroundColor: '#ff4444', color: 'white', padding: '1rem', borderRadius: '8px', marginBottom: '1rem' }}>
+          <div className="bg-red-600 text-white p-4 rounded-lg mb-4">
             {error}
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
+        <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-8">
           {/* Left Column: Game Selection */}
-          <div>
-            <div style={{ marginBottom: '1.5rem', position: 'relative' }}>
-              <FaSearch style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#888' }} />
+          <div className="flex-1 flex flex-col min-h-0">
+            <div className="mb-6 relative shrink-0">
+              <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search games..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '1rem 1rem 1rem 3rem',
-                  fontSize: '1.1rem',
-                  backgroundColor: '#2a2a2a',
-                  border: '1px solid #444',
-                  borderRadius: '8px',
-                  color: 'white'
-                }}
+                className="w-full pl-12 pr-4 py-4 text-lg bg-[#2a2a2a] border border-gray-700 rounded-lg text-white focus:outline-none focus:border-green-400 transition-colors"
               />
             </div>
 
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-              gap: '1rem',
-              maxHeight: '600px',
-              overflowY: 'auto',
-              paddingRight: '0.5rem'
-            }}>
-              {filteredGames.map(game => (
+            <div 
+              ref={gamesContainerRef}
+              onScroll={handleScroll}
+              className="flex-1 overflow-y-auto pr-2 flex flex-wrap gap-4 content-start pb-4"
+            >
+              {games.map(game => (
                 <div
                   key={game.id}
-                  onClick={() => toggleGameSelection(game.id)}
-                  style={{
-                    position: 'relative',
-                    aspectRatio: '3/4',
-                    borderRadius: '8px',
-                    overflow: 'hidden',
-                    cursor: 'pointer',
-                    border: selectedGameIds.includes(game.id) ? '3px solid #00ff88' : '3px solid transparent',
-                    transition: 'all 0.2s'
-                  }}
+                  onClick={() => toggleGameSelection(game)}
+                  className={`relative w-[120px] h-[160px] rounded-lg overflow-hidden cursor-pointer transition-all duration-200 border-2 shadow-lg hover:shadow-xl hover:scale-[1.02] ${
+                    selectedGameIds.has(game.id) ? 'border-[#00ff88]' : 'border-transparent'
+                  }`}
                 >
                   <img
                     src={game.image}
                     alt={game.name}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    className="absolute inset-0 w-full h-full object-cover"
                   />
-                  <div style={{
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    padding: '0.5rem',
-                    background: 'linear-gradient(transparent, rgba(0,0,0,0.9))',
-                    textAlign: 'center'
-                  }}>
-                    <span style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>{game.name}</span>
+                  <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/90 to-transparent text-center">
+                    <span className="text-sm font-bold text-white drop-shadow-md">{game.name}</span>
                   </div>
-                  {selectedGameIds.includes(game.id) && (
-                    <div style={{
-                      position: 'absolute',
-                      top: '0.5rem',
-                      right: '0.5rem',
-                      backgroundColor: '#00ff88',
-                      borderRadius: '50%',
-                      padding: '0.25rem',
-                      display: 'flex'
-                    }}>
-                      <FaCheck color="black" size={12} />
+                  {selectedGameIds.has(game.id) && (
+                    <div className="absolute top-2 right-2 bg-[#00ff88] rounded-full p-1 shadow-md">
+                      <FaCheck className="text-black text-xs" />
                     </div>
                   )}
                 </div>
               ))}
+              {gamesLoading && (
+                <div className="w-full flex justify-center py-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00ff88]"></div>
+                </div>
+              )}
+              {!gamesLoading && games.length === 0 && (
+                <div className="w-full text-center text-gray-500 py-8">
+                  No games found
+                </div>
+              )}
             </div>
           </div>
 
           {/* Right Column: Selected Games List */}
-          <div style={{ backgroundColor: '#1a1a1a', padding: '1.5rem', borderRadius: '12px', height: 'fit-content' }}>
-            <h3 style={{ marginBottom: '1rem', borderBottom: '1px solid #333', paddingBottom: '0.5rem' }}>
-              Selected Games ({selectedGameIds.length})
+          <div className="bg-[#1a1a1a] p-6 rounded-xl flex flex-col w-full lg:w-[350px] shrink-0 max-h-[300px] lg:max-h-none lg:h-auto">
+            <h3 className="text-xl font-bold mb-4 pb-2 border-b border-gray-700 shrink-0">
+              Selected Games ({selectedGames.length})
             </h3>
 
-            {selectedGamesList.length === 0 ? (
-              <p style={{ color: '#888', fontStyle: 'italic' }}>No games selected yet.</p>
+            {selectedGames.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center text-gray-500 italic">
+                No games selected yet.
+              </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '500px', overflowY: 'auto' }}>
-                {selectedGamesList.map(game => (
-                  <div key={game.id} style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    backgroundColor: '#2a2a2a',
-                    padding: '0.75rem',
-                    borderRadius: '6px'
-                  }}>
-                    <span>{game.name}</span>
+              <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+                {selectedGames.map(game => (
+                  <div key={game.id} className="flex items-center justify-between bg-[#2a2a2a] p-3 rounded-lg group">
+                    <span className="font-medium">{game.name}</span>
                     <button
-                      onClick={() => toggleGameSelection(game.id)}
-                      style={{ background: 'none', border: 'none', color: '#ff4444', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                      onClick={() => toggleGameSelection(game)}
+                      className="text-red-500 hover:text-red-400 p-1 rounded transition-colors"
                     >
                       <FaTimes />
                     </button>
@@ -278,20 +295,12 @@ const MinMaxTab = () => {
 
             <button
               onClick={() => getRecommendation()}
-              disabled={loading || selectedGameIds.length === 0}
-              style={{
-                width: '100%',
-                marginTop: '2rem',
-                padding: '1rem',
-                backgroundColor: selectedGameIds.length > 0 ? '#00ff88' : '#444',
-                color: selectedGameIds.length > 0 ? 'black' : '#888',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '1.1rem',
-                fontWeight: 'bold',
-                cursor: selectedGameIds.length > 0 ? 'pointer' : 'not-allowed',
-                transition: 'all 0.2s'
-              }}
+              disabled={loading || selectedGames.length === 0}
+              className={`w-full mt-6 p-4 rounded-lg text-lg font-bold transition-all shrink-0 ${
+                selectedGames.length > 0 
+                  ? 'bg-[#00ff88] text-black hover:bg-[#00cc6a]' 
+                  : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+              }`}
             >
               {loading ? 'Analyzing...' : 'Get Optimal Setup'}
             </button>
@@ -301,7 +310,7 @@ const MinMaxTab = () => {
     );
   }
 
-  // Result View (restored original styling)
+  // Result View
   if (view === 'result' && recommendation) {
     const sortedGames = [...recommendation.details]
       .map(d => {
@@ -320,227 +329,140 @@ const MinMaxTab = () => {
       })
       .sort((a, b) => b.gpu_score - a.gpu_score);
 
-    const LEFT_COL_WIDTH = 320;
-    const GAP = 150;
-    const RIGHT_COL_START = LEFT_COL_WIDTH + GAP;
-    const CONTAINER_HEIGHT = 700;
-    const CENTER_Y = CONTAINER_HEIGHT / 2;
-    const CARD_HEIGHT = 130;
-    const VERTICAL_GAP = (CONTAINER_HEIGHT - (CARD_HEIGHT * 3)) / 2;
-    const CARD_1_Y = (CARD_HEIGHT / 2);
-    const CARD_2_Y = CARD_HEIGHT + VERTICAL_GAP + (CARD_HEIGHT / 2);
-    const CARD_3_Y = (CARD_HEIGHT * 2) + (VERTICAL_GAP * 2) + (CARD_HEIGHT / 2);
-
     const activeBuild = setupMode === 'minimal' ? recommendation.min_build : recommendation.max_build;
 
     return (
-      <div className="minmax-result" style={{
-        padding: '2rem',
-        maxWidth: '1400px',
-        margin: '0 auto',
-        minHeight: '80vh',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
+      <div className="h-full flex flex-col p-4 md:p-8 max-w-[1400px] mx-auto w-full">
+        <div className="flex items-center justify-between mb-6 shrink-0">
           <button
             onClick={() => setView('selection')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              background: 'none',
-              border: 'none',
-              color: '#00ff88',
-              cursor: 'pointer',
-              fontSize: '1.1rem',
-            }}
+            className="flex items-center gap-2 text-[#00ff88] hover:text-[#00cc6a] transition-colors text-lg font-medium"
           >
             <FaArrowLeft /> Back to Selection
           </button>
 
           <button
             onClick={() => setSetupMode(prev => (prev === 'minimal' ? 'recommended' : 'minimal'))}
-            style={{
-              backgroundColor: '#2a2a2a',
-              border: '1px solid #444',
-              borderRadius: '8px',
-              color: 'white',
-              padding: '0.75rem 1rem',
-              cursor: 'pointer',
-              fontSize: '1rem',
-            }}
+            className="bg-[#2a2a2a] border border-gray-700 rounded-lg text-white px-4 py-2 hover:bg-[#333] transition-colors"
           >
             Showing: {setupMode === 'minimal' ? 'Minimum' : 'Recommended'} (click to switch)
           </button>
         </div>
 
-        <div style={{
-          display: 'flex',
-          gap: `${GAP}px`,
-          alignItems: 'center',
-          position: 'relative',
-          minHeight: `${CONTAINER_HEIGHT}px`
-        }}>
-          {/* SVG Lines Layer */}
-          <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }}>
-            <defs>
-              <linearGradient id="grad1" gradientUnits="userSpaceOnUse" x1={LEFT_COL_WIDTH} y1="0" x2={RIGHT_COL_START} y2="0">
-                <stop offset="0%" style={{ stopColor: '#00ff88', stopOpacity: 1 }} />
-                <stop offset="100%" style={{ stopColor: '#ffffff', stopOpacity: 1 }} />
-              </linearGradient>
-              <linearGradient id="grad2" gradientUnits="userSpaceOnUse" x1={LEFT_COL_WIDTH} y1="0" x2={RIGHT_COL_START} y2="0">
-                <stop offset="0%" style={{ stopColor: '#00ccff', stopOpacity: 1 }} />
-                <stop offset="100%" style={{ stopColor: '#ffffff', stopOpacity: 1 }} />
-              </linearGradient>
-              <linearGradient id="grad3" gradientUnits="userSpaceOnUse" x1={LEFT_COL_WIDTH} y1="0" x2={RIGHT_COL_START} y2="0">
-                <stop offset="0%" style={{ stopColor: '#ff0088', stopOpacity: 1 }} />
-                <stop offset="100%" style={{ stopColor: '#ffffff', stopOpacity: 1 }} />
-              </linearGradient>
-            </defs>
-            <path
-              d={`M ${LEFT_COL_WIDTH} ${CARD_1_Y} C ${LEFT_COL_WIDTH + GAP / 2} ${CARD_1_Y}, ${LEFT_COL_WIDTH + GAP / 2} ${CENTER_Y}, ${RIGHT_COL_START} ${CENTER_Y}`}
-              fill="none" stroke="url(#grad1)" strokeWidth="3" strokeDasharray="8,8"
-            />
-            <path
-              d={`M ${LEFT_COL_WIDTH} ${CARD_2_Y} C ${LEFT_COL_WIDTH + GAP / 2} ${CARD_2_Y}, ${LEFT_COL_WIDTH + GAP / 2} ${CENTER_Y}, ${RIGHT_COL_START} ${CENTER_Y}`}
-              fill="none" stroke="url(#grad2)" strokeWidth="3" strokeDasharray="8,8"
-            />
-            <path
-              d={`M ${LEFT_COL_WIDTH} ${CARD_3_Y} C ${LEFT_COL_WIDTH + GAP / 2} ${CARD_3_Y}, ${LEFT_COL_WIDTH + GAP / 2} ${CENTER_Y}, ${RIGHT_COL_START} ${CENTER_Y}`}
-              fill="none" stroke="url(#grad3)" strokeWidth="3" strokeDasharray="8,8"
-            />
-            <circle cx={LEFT_COL_WIDTH} cy={CARD_1_Y} r="6" fill="#00ff88" />
-            <circle cx={LEFT_COL_WIDTH} cy={CARD_2_Y} r="6" fill="#00ccff" />
-            <circle cx={LEFT_COL_WIDTH} cy={CARD_3_Y} r="6" fill="#ff0088" />
-          </svg>
-
+        <div className="flex-1 min-h-0 flex items-stretch">
           {/* Left Column: Specs */}
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            height: `${CONTAINER_HEIGHT}px`,
-            width: `${LEFT_COL_WIDTH}px`,
-            zIndex: 2
-          }}>
-            <div style={{ backgroundColor: '#1a1a1a', padding: '1.5rem', borderRadius: '12px', borderLeft: '5px solid #00ff88', height: `${CARD_HEIGHT}px`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-                <FaDesktop size={24} color="#00ff88" />
-                <h3 style={{ margin: 0 }}>Graphics Card</h3>
+          <div className="w-[300px] md:w-[320px] flex flex-col justify-between z-20 shrink-0">
+            <div className="flex-1 flex items-center py-2">
+              <div className="w-full bg-[#1a1a1a] p-6 rounded-xl border-l-[5px] border-[#00ff88] shadow-lg">
+                <div className="flex items-center gap-4 mb-2">
+                  <FaDesktop size={24} className="text-[#00ff88]" />
+                  <h3 className="m-0 font-bold">Graphics Card</h3>
+                </div>
+                <div className="text-xl md:text-2xl font-bold mb-1 truncate" title={activeBuild.gpu_name}>{activeBuild.gpu_name}</div>
+                <div className="text-gray-400 text-sm">Score: {activeBuild.gpu_score} • Tier: {activeBuild.tier}</div>
               </div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>{activeBuild.gpu_name}</div>
-              <div style={{ color: '#888' }}>Score: {activeBuild.gpu_score} • Tier: {activeBuild.tier}</div>
             </div>
 
-            <div style={{ backgroundColor: '#1a1a1a', padding: '1.5rem', borderRadius: '12px', borderLeft: '5px solid #00ccff', height: `${CARD_HEIGHT}px`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-                <FaMicrochip size={24} color="#00ccff" />
-                <h3 style={{ margin: 0 }}>Processor</h3>
+            <div className="flex-1 flex items-center py-2">
+              <div className="w-full bg-[#1a1a1a] p-6 rounded-xl border-l-[5px] border-[#00ccff] shadow-lg">
+                <div className="flex items-center gap-4 mb-2">
+                  <FaMicrochip size={24} className="text-[#00ccff]" />
+                  <h3 className="m-0 font-bold">Processor</h3>
+                </div>
+                <div className="text-xl md:text-2xl font-bold mb-1 truncate" title={activeBuild.cpu_name}>{activeBuild.cpu_name}</div>
+                <div className="text-gray-400 text-sm">Score: {activeBuild.cpu_score}</div>
               </div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>{activeBuild.cpu_name}</div>
-              <div style={{ color: '#888' }}>Score: {activeBuild.cpu_score}</div>
             </div>
 
-            <div style={{ backgroundColor: '#1a1a1a', padding: '1.5rem', borderRadius: '12px', borderLeft: '5px solid #ff0088', height: `${CARD_HEIGHT}px`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
-                <FaMemory size={24} color="#ff0088" />
-                <h3 style={{ margin: 0 }}>Memory</h3>
+            <div className="flex-1 flex items-center py-2">
+              <div className="w-full bg-[#1a1a1a] p-6 rounded-xl border-l-[5px] border-[#ff0088] shadow-lg">
+                <div className="flex items-center gap-4 mb-2">
+                  <FaMemory size={24} className="text-[#ff0088]" />
+                  <h3 className="m-0 font-bold">Memory</h3>
+                </div>
+                <div className="text-xl md:text-2xl font-bold mb-1">
+                  {activeBuild.ram_gb ? `${activeBuild.ram_gb} GB` : 'Unknown'}
+                </div>
+                <div className="text-gray-400 text-sm">{activeBuild.description}</div>
               </div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>
-                {activeBuild.ram_gb ? `${activeBuild.ram_gb} GB` : 'Unknown'}
-              </div>
-              <div style={{ color: '#888' }}>{activeBuild.description}</div>
             </div>
           </div>
 
+          {/* Middle Gap with SVG Lines */}
+          <div className="w-[50px] md:w-[150px] relative z-10 shrink-0 hidden md:block">
+            <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="grad1" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="100" y2="0">
+                  <stop offset="0%" stopColor="#00ff88" />
+                  <stop offset="100%" stopColor="#ffffff" />
+                </linearGradient>
+                <linearGradient id="grad2" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="100" y2="0">
+                  <stop offset="0%" stopColor="#00ccff" />
+                  <stop offset="100%" stopColor="#ffffff" />
+                </linearGradient>
+                <linearGradient id="grad3" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="100" y2="0">
+                  <stop offset="0%" stopColor="#ff0088" />
+                  <stop offset="100%" stopColor="#ffffff" />
+                </linearGradient>
+              </defs>
+              {/* Paths connecting 16.6%, 50%, 83.3% on left to 50% on right */}
+              <path
+                d="M 0 16.66 C 50 16.66, 50 50, 100 50"
+                fill="none" stroke="url(#grad1)" strokeWidth="0.5" strokeDasharray="2,2" vectorEffect="non-scaling-stroke"
+              />
+              <path
+                d="M 0 50 C 50 50, 50 50, 100 50"
+                fill="none" stroke="url(#grad2)" strokeWidth="0.5" strokeDasharray="2,2" vectorEffect="non-scaling-stroke"
+              />
+              <path
+                d="M 0 83.33 C 50 83.33, 50 50, 100 50"
+                fill="none" stroke="url(#grad3)" strokeWidth="0.5" strokeDasharray="2,2" vectorEffect="non-scaling-stroke"
+              />
+              <circle cx="0" cy="16.66" r="1" fill="#00ff88" vectorEffect="non-scaling-stroke" />
+              <circle cx="0" cy="50" r="1" fill="#00ccff" vectorEffect="non-scaling-stroke" />
+              <circle cx="0" cy="83.33" r="1" fill="#ff0088" vectorEffect="non-scaling-stroke" />
+            </svg>
+          </div>
+
           {/* Right Column: Visual Representation */}
-          <div style={{
-            flex: 1,
-            backgroundColor: '#2a2a2a',
-            borderRadius: '20px',
-            height: `${CONTAINER_HEIGHT}px`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            position: 'relative',
-            zIndex: 2,
-            overflow: 'hidden'
-          }}>
-            <div style={{ position: 'absolute', left: '0', top: '50%', width: '12px', height: '12px', backgroundColor: 'white', borderRadius: '50%', transform: 'translate(-50%, -50%)', zIndex: 10 }}></div>
+          <div className="flex-1 bg-[#2a2a2a] rounded-[20px] relative z-20 flex flex-col min-h-0 overflow-hidden">
+            <div className="absolute left-0 top-1/2 w-3 h-3 bg-white rounded-full -translate-x-1/2 -translate-y-1/2 z-30 hidden md:block"></div>
 
-            <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div className="flex-1 overflow-x-auto flex items-center px-8 gap-6 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
               {sortedGames.map((game, index) => {
-                const offset = index - activeIndex;
                 const isActive = index === activeIndex;
-
-                const xOffset = offset * 220;
-                const scale = isActive ? 1 : Math.max(0.7, 1 - Math.abs(offset) * 0.15);
-                const zIndex = 100 - Math.abs(offset);
-                const opacity = Math.abs(offset) > 2 ? 0 : 1 - Math.abs(offset) * 0.2;
 
                 return (
                   <div
                     key={game.id}
                     onClick={() => setActiveIndex(index)}
+                    className={`relative shrink-0 w-[260px] h-[380px] md:w-[280px] md:h-[420px] rounded-2xl bg-cover bg-center transition-all duration-300 ease-out cursor-pointer flex flex-col justify-end p-6 border snap-center ${
+                      isActive ? 'border-[#00ff88] shadow-[0_20px_50px_rgba(0,0,0,0.7)] scale-100 opacity-100' : 'border-[#444] shadow-[0_10px_30px_rgba(0,0,0,0.5)] scale-95 opacity-60 hover:opacity-100'
+                    }`}
                     style={{
-                      position: 'absolute',
-                      width: '280px',
-                      height: '420px',
-                      borderRadius: '16px',
                       backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0) 40%, rgba(0,0,0,0.95) 90%), url(${game.image})`,
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
-                      boxShadow: isActive ? '0 20px 50px rgba(0,0,0,0.7)' : '0 10px 30px rgba(0,0,0,0.5)',
-                      transform: `translateX(${xOffset}px) scale(${scale})`,
-                      zIndex: zIndex,
-                      opacity: opacity,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'flex-end',
-                      padding: '1.5rem',
-                      border: isActive ? '2px solid #00ff88' : '1px solid #444',
-                      transition: 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)',
-                      cursor: 'pointer'
                     }}
                   >
-                    <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>{game.name}</h3>
+                    <h3 className="text-2xl font-bold mb-4 drop-shadow-md">{game.name}</h3>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <FaDesktop size={14} color="#00ff88" />
-                        <span style={{ color: '#ddd', fontSize: '0.9rem' }}>{game.required_gpu}</span>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <FaDesktop size={14} className="text-[#00ff88]" />
+                        <span className="text-gray-200 text-sm">{game.required_gpu}</span>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <FaMicrochip size={14} color="#00ccff" />
-                        <span style={{ color: '#ddd', fontSize: '0.9rem' }}>{game.required_cpu}</span>
+                      <div className="flex items-center gap-2">
+                        <FaMicrochip size={14} className="text-[#00ccff]" />
+                        <span className="text-gray-200 text-sm">{game.required_cpu}</span>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <FaMemory size={14} color="#ff0088" />
-                        <span style={{ color: '#ddd', fontSize: '0.9rem' }}>{game.required_memory}</span>
+                      <div className="flex items-center gap-2">
+                        <FaMemory size={14} className="text-[#ff0088]" />
+                        <span className="text-gray-200 text-sm">{game.required_memory}</span>
                       </div>
 
                       {isActive && (
                         <button
                           onClick={(e) => { e.stopPropagation(); handleDeleteGame(game.id); }}
-                          style={{
-                            marginTop: '1rem',
-                            background: 'rgba(255, 68, 68, 0.2)',
-                            color: '#ff4444',
-                            border: '1px solid #ff4444',
-                            borderRadius: '6px',
-                            padding: '0.5rem',
-                            cursor: 'pointer',
-                            fontSize: '0.9rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.5rem',
-                            transition: 'background 0.2s'
-                          }}
-                          onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 68, 68, 0.4)'}
-                          onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 68, 68, 0.2)'}
+                          className="mt-4 bg-red-500/20 text-red-500 border border-red-500 rounded-md p-2 text-sm flex items-center justify-center gap-2 hover:bg-red-500/40 transition-colors"
                         >
                           <FaTimes size={12} /> Remove Game
                         </button>
