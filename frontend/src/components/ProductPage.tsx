@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
 import { API_BASE_URL } from '../config';
-import DealHistoryChart from './DealHistoryChart';
 
 interface Product {
   id: number;
