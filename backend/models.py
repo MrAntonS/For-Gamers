@@ -44,6 +44,37 @@ class Game(db.Model):
     linux_requirements = db.Column(db.Text, nullable=True) # JSON string or text
     last_updated = db.Column(db.DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
+    def calculate_deal_score(self):
+        """
+        Calculate a deal score based on rating confidence, savings, and verification.
+        Higher scores = better deals.
+        """
+        import math
+        
+        # Rating normalized to 0-1
+        rating_score = (self.rating or 0) / 5.0
+        
+        # Review confidence: log10(reviews + 1) / 5, capped at 1.0
+        reviews = self.review_count or 0
+        review_confidence = min(math.log10(reviews + 1) / 5.0, 1.0)
+        
+        # Weighted rating: rating × (0.3 + 0.7 × review_confidence)
+        weighted_rating = rating_score * (0.3 + 0.7 * review_confidence)
+        
+        # Savings in dollars
+        original = self.original_price or 0
+        current = self.price or 0
+        savings = max(original - current, 0)
+        discount_pct = self.discount or 0
+        
+        # Savings factor
+        savings_factor = 1 + (savings / 20.0) + (discount_pct / 100.0)
+        
+        # Verification boost
+        verification_boost = 1.25 if self.deal_last_verified else 1.0
+        
+        return round(weighted_rating * savings_factor * verification_boost * 100, 1)
+
     def to_dict(self):
         return {
             'id': self.id,
@@ -57,6 +88,7 @@ class Game(db.Model):
             'description': self.description,
             'rating': self.rating,
             'reviewCount': self.review_count,
+            'dealScore': self.calculate_deal_score(),
             'isActive': self.is_active,
             'lastUpdated': self.last_updated.isoformat() if self.last_updated else None,
             'dealLastVerified': self.deal_last_verified.isoformat() if self.deal_last_verified else None,

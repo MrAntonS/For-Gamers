@@ -46,11 +46,47 @@ def get_products():
         # Pagination
         total_games = query.count()
         
-        # Sort by rating (desc) > review_count (desc) > discount (desc)
+        # Calculate deal score for sorting
+        # Score = weighted_rating × savings_factor × verification_boost
+        # - weighted_rating: rating weighted by review confidence (log scale)
+        # - savings_factor: combines absolute savings and discount percentage
+        # - verification_boost: 1.25x for verified deals
+        from sqlalchemy import case, func as sql_func
+        import math
+        
+        # Review confidence: log10(reviews + 1) / 5, capped at 1.0
+        # SQLite doesn't have log10, so we use ln(x) / ln(10)
+        review_confidence = sql_func.min(
+            sql_func.coalesce(
+                sql_func.log(sql_func.coalesce(Game.review_count, 0) + 1) / math.log(10) / 5.0,
+                0
+            ),
+            1.0
+        )
+        
+        # Weighted rating: rating × (0.3 + 0.7 × review_confidence)
+        # This ensures even games with few reviews get some weight (30%)
+        rating_normalized = sql_func.coalesce(Game.rating, 0) / 5.0
+        weighted_rating = rating_normalized * (0.3 + 0.7 * review_confidence)
+        
+        # Savings in dollars
+        savings = sql_func.coalesce(Game.original_price, 0) - sql_func.coalesce(Game.price, 0)
+        
+        # Savings factor: 1 + (savings / 20) + (discount_pct / 100)
+        # Each $20 saved doubles the base, plus discount percentage bonus
+        savings_factor = 1 + (savings / 20.0) + (sql_func.coalesce(Game.discount, 0) / 100.0)
+        
+        # Verification boost: 1.25x if verified
+        verification_boost = case(
+            (Game.deal_last_verified != None, 1.25),
+            else_=1.0
+        )
+        
+        # Final deal score
+        deal_score = weighted_rating * savings_factor * verification_boost * 100
+        
         games = query.order_by(
-            Game.rating.desc().nullslast(),
-            Game.review_count.desc().nullslast(),
-            Game.discount.desc()
+            deal_score.desc()
         ).paginate(page=page, per_page=limit, error_out=False)
         
         products = [game.to_dict() for game in games.items]
