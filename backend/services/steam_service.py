@@ -3,7 +3,7 @@ import os
 import time
 import json
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from bs4 import BeautifulSoup
 from models import db, Game, DealHistory
 from sqlalchemy.exc import IntegrityError
@@ -734,7 +734,7 @@ def save_cheapshark_deal(deal):
         # This runs for ALL active deals with discount, even if no changes
         sale_start_epoch = deal.get('lastChange') or deal.get('lastChangeTime')
         if sale_start_epoch and game.is_active and game.discount > 0:
-            sale_start = datetime.utcfromtimestamp(int(sale_start_epoch))
+            sale_start = datetime.fromtimestamp(int(sale_start_epoch), tz=timezone.utc)
             # Check if a DealHistory entry exists at or after sale_start
             existing = DealHistory.query.filter(
                 DealHistory.game_id == game.id,
@@ -824,7 +824,7 @@ def verify_deal_on_steam(steam_id):
                 # Steam provides discount_end_rtime as Unix timestamp
                 discount_end = sub.get('discount_end_rtime')
                 if discount_end and discount_end > 0:
-                    deal_ends_at = datetime.utcfromtimestamp(discount_end)
+                    deal_ends_at = datetime.fromtimestamp(discount_end, tz=timezone.utc)
                     break
             if deal_ends_at:
                 break

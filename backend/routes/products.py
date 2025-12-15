@@ -1106,7 +1106,8 @@ def verify_game_in_background(game_id, app):
             if sale_start:
                 # If stored as epoch, convert to datetime (assume UTC)
                 if isinstance(sale_start, (int, float)):
-                    sale_start = datetime.utcfromtimestamp(int(sale_start))
+                    from datetime import timezone
+                    sale_start = datetime.fromtimestamp(int(sale_start), tz=timezone.utc)
 
                 # Check for existing start entry
                 start_entry = DealHistory.query.filter(
