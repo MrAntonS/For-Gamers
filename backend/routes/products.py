@@ -85,7 +85,7 @@ def get_products():
     brands_list = brands_filter.split(',') if brands_filter else []
     
     platforms_filter = request.args.get('platforms', '')
-    # platforms_list = platforms_filter.split(',') if platforms_filter else []
+    platforms_list = platforms_filter.split(',') if platforms_filter else []
 
     # Determine what to fetch
     fetch_games = True
@@ -108,8 +108,12 @@ def get_products():
             fetch_hardware = False
 
     # Implicitly disable hardware if filtering by game-specific attributes
-    if genres_list or platforms_filter:
+    if genres_list or platforms_list:
         fetch_hardware = False
+        
+    # Filter Games by Brand (All games are currently assumed to be 'Steam')
+    if brands_list and 'Steam' not in brands_list:
+        fetch_games = False
 
     # --- Fetch and Filter Games (DB) ---
     games_data = []
@@ -127,6 +131,11 @@ def get_products():
             # AND logic: Game must match ALL selected genres
             for g in genres_list:
                 query = query.filter(Game.genres.ilike(f'%{g}%'))
+        
+        if platforms_list:
+            # AND logic: Game must match ALL selected platforms
+            for p in platforms_list:
+                query = query.filter(Game.platforms.ilike(f'%{p}%'))
             
         games_list = query.all()
         games_data = [g.to_dict() for g in games_list]
@@ -196,6 +205,84 @@ def get_products():
         "total_pages": total_pages,
         "total": total_items,
         "page": page
+    })
+
+@products_bp.route('/api/filters')
+def get_filters():
+    """
+    Get all available filter options (genres, brands, platforms, global price range).
+    Ensures that every returned option applies to at least one product.
+    """
+    # 1. Fetch all active games to aggregate dynamic fields
+    games = Game.query.filter(Game.is_active == True).all()
+
+    genres_set = set()
+    platforms_set = set()
+    
+    # Track min/max price
+    # Start with extreme values
+    min_p = float('inf')
+    max_p = float('-inf')
+    
+    has_games = len(games) > 0
+    
+    for g in games:
+        # Genres
+        if g.genres:
+            for genre in g.genres.split(','):
+                genres_set.add(genre.strip())
+        
+        # Platforms
+        if g.platforms:
+            for platform in g.platforms.split(','):
+                platforms_set.add(platform.strip())
+                
+        # Price
+        p = g.price if g.price is not None else 0
+        if p < min_p: min_p = p
+        if p > max_p: max_p = p
+
+    # 2. Process Mock Hardware
+    hardware_brands_set = set()
+    hardware_categories_set = set()
+    
+    has_hardware = len(FULL_MOCK_HARDWARE) > 0
+    
+    for item in FULL_MOCK_HARDWARE:
+        # Brands
+        if 'brand' in item:
+            hardware_brands_set.add(item['brand'])
+        
+        # Categories
+        if 'category' in item:
+            hardware_categories_set.add(item['category'])
+            
+        # Price
+        p = item['price'] if item.get('price') is not None else 0
+        if p < min_p: min_p = p
+        if p > max_p: max_p = p
+
+    # Combine Brands (Games are implicitly "Steam" brand if they exist)
+    brands = list(hardware_brands_set)
+    if has_games:
+        brands.append('Steam')
+    
+    # Combine Categories
+    categories = list(hardware_categories_set)
+    if has_games and 'Game' not in categories:
+        categories.append('Game')
+        
+    # Handle case with no data
+    if min_p == float('inf'): min_p = 0
+    if max_p == float('-inf'): max_p = 0
+
+    return jsonify({
+        "genres": sorted(list(genres_set)),
+        "platforms": sorted(list(platforms_set)),
+        "brands": sorted(brands),
+        "categories": sorted(categories),
+        "price_min": min_p,
+        "price_max": max_p
     })
 
 @products_bp.route('/api/products/<int:product_id>')

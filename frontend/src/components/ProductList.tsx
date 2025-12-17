@@ -20,8 +20,19 @@ interface Filters {
   maxPrice: number;
   categories: string[];
   brands: string[];
+  genres: string[];
+  platforms: string[];
   rating: number;
   sort: string;
+}
+
+interface FilterOptions {
+  genres: string[];
+  platforms: string[];
+  brands: string[];
+  categories: string[];
+  price_min: number;
+  price_max: number;
 }
 
 const FilterSection = ({ title, children }: { title: string, children: React.ReactNode }) => (
@@ -57,12 +68,24 @@ const ProductList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  // Filter options from backend
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({
+    genres: [],
+    platforms: [],
+    brands: [],
+    categories: [],
+    price_min: 0,
+    price_max: 2000
+  });
+
   // Filter state
   const [filters, setFilters] = useState<Filters>({
     minPrice: 0,
     maxPrice: 2000,
     categories: [],
     brands: [],
+    genres: [],
+    platforms: [],
     rating: 0,
     sort: 'featured'
   });
@@ -73,20 +96,41 @@ const ProductList = () => {
   // Check if filters have changed
   const hasFilterChanges = JSON.stringify(filters) !== JSON.stringify(appliedFilters);
 
+  // Fetch filter options on mount
+  useEffect(() => {
+    const fetchFilters = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/filters`);
+        if (res.ok) {
+          const data = await res.json();
+          setFilterOptions(data);
+          // Optionally adjust max price based on actual data
+          // setFilters(prev => ({ ...prev, maxPrice: data.price_max })); 
+        }
+      } catch (err) {
+        console.error("Failed to fetch filters", err);
+      }
+    };
+    fetchFilters();
+  }, []);
+
   useEffect(() => {
     const fetchProducts = async () => {
       setLoading(true);
       try {
         const queryParams = new URLSearchParams({
           page: currentPage.toString(),
-          limit: '48',
+          limit: '10',
           min_price: appliedFilters.minPrice.toString(),
           max_price: appliedFilters.maxPrice.toString(),
           rating: appliedFilters.rating.toString(),
           sort: appliedFilters.sort,
           // Join arrays with commas
+          // Join arrays with commas
           categories: appliedFilters.categories.join(','),
-          brands: appliedFilters.brands.join(',')
+          brands: appliedFilters.brands.join(','),
+          genres: appliedFilters.genres.join(','),
+          platforms: appliedFilters.platforms.join(',')
         });
 
         const response = await fetch(`${API_BASE_URL}/api/products?${queryParams.toString()}`);
@@ -129,6 +173,24 @@ const ProductList = () => {
     }));
   };
 
+  const handleGenreChange = (genre: string, checked: boolean) => {
+    setFilters(prev => ({
+      ...prev,
+      genres: checked
+        ? [...prev.genres, genre]
+        : prev.genres.filter(g => g !== genre)
+    }));
+  };
+
+  const handlePlatformChange = (platform: string, checked: boolean) => {
+    setFilters(prev => ({
+      ...prev,
+      platforms: checked
+        ? [...prev.platforms, platform]
+        : prev.platforms.filter(p => p !== platform)
+    }));
+  };
+
   return (
     <div className="bg-black h-full text-white flex overflow-hidden">
       {/* Sidebar Filters */}
@@ -142,8 +204,8 @@ const ProductList = () => {
             onClick={handleApplyFilters}
             disabled={!hasFilterChanges}
             className={`w-full py-2 px-4 rounded font-bold text-sm transition-all duration-200 ${hasFilterChanges
-                ? 'bg-red-600 hover:bg-red-700 text-white shadow-[0_0_10px_rgba(220,38,38,0.5)]'
-                : 'bg-gray-800 text-gray-500 cursor-not-allowed opacity-50'
+              ? 'bg-red-600 hover:bg-red-700 text-white shadow-[0_0_10px_rgba(220,38,38,0.5)]'
+              : 'bg-gray-800 text-gray-500 cursor-not-allowed opacity-50'
               }`}
           >
             {hasFilterChanges ? 'Apply Filters' : 'No Changes'}
@@ -151,7 +213,7 @@ const ProductList = () => {
         </div>
 
         <FilterSection title="Categories">
-          {['Game', 'Hardware', 'Consoles', 'Components', 'Peripherals', 'Merchandise'].map(cat => (
+          {filterOptions.categories.map(cat => (
             <CheckboxFilter
               key={cat}
               label={cat}
@@ -161,25 +223,51 @@ const ProductList = () => {
           ))}
         </FilterSection>
 
+        {filterOptions.genres.length > 0 && (
+          <FilterSection title="Genres">
+            {filterOptions.genres.map(genre => (
+              <CheckboxFilter
+                key={genre}
+                label={genre}
+                checked={filters.genres.includes(genre)}
+                onChange={(checked) => handleGenreChange(genre, checked)}
+              />
+            ))}
+          </FilterSection>
+        )}
+
+        {filterOptions.platforms.length > 0 && (
+          <FilterSection title="Platforms">
+            {filterOptions.platforms.map(platform => (
+              <CheckboxFilter
+                key={platform}
+                label={platform}
+                checked={filters.platforms.includes(platform)}
+                onChange={(checked) => handlePlatformChange(platform, checked)}
+              />
+            ))}
+          </FilterSection>
+        )}
+
         <FilterSection title="Price Range">
           <div className="px-1">
             <input
               type="range"
-              min="0"
-              max="2000"
+              min={filterOptions.price_min}
+              max={filterOptions.price_max || 2000}
               value={filters.maxPrice}
               onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: Number(e.target.value) }))}
               className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-red-600"
             />
             <div className="flex justify-between mt-2 text-xs text-gray-400">
-              <span>$0</span>
+              <span>${filterOptions.price_min}</span>
               <span>${filters.maxPrice}</span>
             </div>
           </div>
         </FilterSection>
 
         <FilterSection title="Brands">
-          {['NVIDIA', 'AMD', 'Sony', 'Nintendo', 'Logitech', 'Razer'].map(brand => (
+          {filterOptions.brands.map(brand => (
             <CheckboxFilter
               key={brand}
               label={brand}

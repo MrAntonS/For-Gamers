@@ -25,6 +25,15 @@ interface Filters {
   sort: string;
 }
 
+interface FilterOptions {
+  genres: string[];
+  platforms: string[];
+  brands: string[];
+  categories: string[];
+  price_min: number;
+  price_max: number;
+}
+
 const FilterSection = ({ title, children }: { title: string, children: React.ReactNode }) => (
   <div className="mb-6">
     <h3 className="text-red-500 font-bold uppercase tracking-wider mb-3 text-sm">{title}</h3>
@@ -58,10 +67,20 @@ const GameDeals = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  // Filter options from backend
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({
+    genres: [],
+    platforms: [],
+    brands: [],
+    categories: [],
+    price_min: 0,
+    price_max: 2000
+  });
+
   // Filter state
   const [filters, setFilters] = useState<Filters>({
     minPrice: 0,
-    maxPrice: 100,
+    maxPrice: 2000,
     genres: [],
     platforms: [],
     releaseYears: [],
@@ -76,13 +95,29 @@ const GameDeals = () => {
   const hasFilterChanges = JSON.stringify(filters) !== JSON.stringify(appliedFilters);
 
   useEffect(() => {
+    const fetchFilters = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/filters`);
+        if (res.ok) {
+          const data = await res.json();
+          setFilterOptions(data);
+          // Optionally adjust local max price if needed, but keeping default is safer for now
+        }
+      } catch (err) {
+        console.error("Failed to fetch filters", err);
+      }
+    };
+    fetchFilters();
+  }, []);
+
+  useEffect(() => {
     const fetchGames = async () => {
       setLoading(true);
       try {
         const queryParams = new URLSearchParams({
           category: 'Game',
           page: currentPage.toString(),
-          limit: '48', // Fixed limit since we removed the selector
+          limit: '10',
           min_price: appliedFilters.minPrice.toString(),
           max_price: appliedFilters.maxPrice.toString(),
           rating: appliedFilters.rating.toString(),
@@ -109,7 +144,7 @@ const GameDeals = () => {
           dealLastVerified: p.dealLastVerified
         }));
         setGames(mappedGames);
-        setTotalPages(data.totalPages || 1);
+        setTotalPages(data.total_pages || 1);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
@@ -165,48 +200,52 @@ const GameDeals = () => {
             onClick={handleApplyFilters}
             disabled={!hasFilterChanges}
             className={`w-full py-2 px-4 rounded font-bold text-sm transition-all duration-200 ${hasFilterChanges
-                ? 'bg-red-600 hover:bg-red-700 text-white shadow-[0_0_10px_rgba(220,38,38,0.5)]'
-                : 'bg-gray-800 text-gray-500 cursor-not-allowed opacity-50'
+              ? 'bg-red-600 hover:bg-red-700 text-white shadow-[0_0_10px_rgba(220,38,38,0.5)]'
+              : 'bg-gray-800 text-gray-500 cursor-not-allowed opacity-50'
               }`}
           >
             {hasFilterChanges ? 'Apply Filters' : 'No Changes'}
           </button>
         </div>
 
-        <FilterSection title="Genre">
-          {['Action', 'RPG', 'Adventure', 'Strategy', 'Simulation', 'Sports', 'Racing', 'Shooter'].map(genre => (
-            <CheckboxFilter
-              key={genre}
-              label={genre}
-              checked={filters.genres.includes(genre)}
-              onChange={(checked) => handleGenreChange(genre, checked)}
-            />
-          ))}
-        </FilterSection>
+        {filterOptions.genres.length > 0 && (
+          <FilterSection title="Genre">
+            {filterOptions.genres.map(genre => (
+              <CheckboxFilter
+                key={genre}
+                label={genre}
+                checked={filters.genres.includes(genre)}
+                onChange={(checked) => handleGenreChange(genre, checked)}
+              />
+            ))}
+          </FilterSection>
+        )}
 
-        <FilterSection title="Platform">
-          {['PC', 'PlayStation', 'Xbox', 'Nintendo Switch', 'Steam Deck'].map(platform => (
-            <CheckboxFilter
-              key={platform}
-              label={platform}
-              checked={filters.platforms.includes(platform)}
-              onChange={(checked) => handlePlatformChange(platform, checked)}
-            />
-          ))}
-        </FilterSection>
+        {filterOptions.platforms.length > 0 && (
+          <FilterSection title="Platform">
+            {filterOptions.platforms.map(platform => (
+              <CheckboxFilter
+                key={platform}
+                label={platform}
+                checked={filters.platforms.includes(platform)}
+                onChange={(checked) => handlePlatformChange(platform, checked)}
+              />
+            ))}
+          </FilterSection>
+        )}
 
         <FilterSection title="Price Range">
           <div className="px-1">
             <input
               type="range"
-              min="0"
-              max="100"
+              min={filterOptions.price_min}
+              max={filterOptions.price_max || 100}
               value={filters.maxPrice}
               onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: Number(e.target.value) }))}
               className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-red-600"
             />
             <div className="flex justify-between mt-2 text-xs text-gray-400">
-              <span>$0</span>
+              <span>${filterOptions.price_min}</span>
               <span>${filters.maxPrice}</span>
             </div>
           </div>
