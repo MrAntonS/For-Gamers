@@ -15,6 +15,16 @@ interface GameDeal {
   dealLastVerified?: string;
 }
 
+interface Filters {
+  minPrice: number;
+  maxPrice: number;
+  genres: string[];
+  platforms: string[];
+  releaseYears: string[];
+  rating: number;
+  sort: string;
+}
+
 const FilterSection = ({ title, children }: { title: string, children: React.ReactNode }) => (
   <div className="mb-6">
     <h3 className="text-red-500 font-bold uppercase tracking-wider mb-3 text-sm">{title}</h3>
@@ -24,10 +34,15 @@ const FilterSection = ({ title, children }: { title: string, children: React.Rea
   </div>
 );
 
-const CheckboxFilter = ({ label }: { label: string }) => (
+const CheckboxFilter = ({ label, checked, onChange }: { label: string, checked: boolean, onChange: (checked: boolean) => void }) => (
   <label className="flex items-center space-x-3 cursor-pointer group">
     <div className="relative flex items-center">
-      <input type="checkbox" className="peer h-4 w-4 cursor-pointer appearance-none rounded border border-gray-600 bg-gray-900 checked:border-red-600 checked:bg-red-600 transition-all" />
+      <input
+        type="checkbox"
+        className="peer h-4 w-4 cursor-pointer appearance-none rounded border border-gray-600 bg-gray-900 checked:border-red-600 checked:bg-red-600 transition-all"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+      />
       <svg className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 text-white opacity-0 peer-checked:opacity-100 pointer-events-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
         <polyline points="20 6 9 17 4 12"></polyline>
       </svg>
@@ -40,15 +55,44 @@ const GameDeals = () => {
   const [games, setGames] = useState<GameDeal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [priceRange, setPriceRange] = useState(100);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+
+  // Filter state
+  const [filters, setFilters] = useState<Filters>({
+    minPrice: 0,
+    maxPrice: 100,
+    genres: [],
+    platforms: [],
+    releaseYears: [],
+    rating: 0,
+    sort: 'featured'
+  });
+
+  // Applied filters state
+  const [appliedFilters, setAppliedFilters] = useState<Filters>(filters);
+
+  // Check if filters have changed
+  const hasFilterChanges = JSON.stringify(filters) !== JSON.stringify(appliedFilters);
 
   useEffect(() => {
     const fetchGames = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`${API_BASE_URL}/api/products?category=Game&page=${currentPage}&limit=10`);
+        const queryParams = new URLSearchParams({
+          category: 'Game',
+          page: currentPage.toString(),
+          limit: '48', // Fixed limit since we removed the selector
+          min_price: appliedFilters.minPrice.toString(),
+          max_price: appliedFilters.maxPrice.toString(),
+          rating: appliedFilters.rating.toString(),
+          sort: appliedFilters.sort,
+          genres: appliedFilters.genres.join(','),
+          platforms: appliedFilters.platforms.join(','),
+          release_years: appliedFilters.releaseYears.join(',')
+        });
+
+        const response = await fetch(`${API_BASE_URL}/api/products?${queryParams.toString()}`);
         if (!response.ok) {
           throw new Error('Failed to fetch game deals');
         }
@@ -74,76 +118,131 @@ const GameDeals = () => {
     };
 
     fetchGames();
-  }, [currentPage]);
+  }, [currentPage, appliedFilters]);
+
+  const handleApplyFilters = () => {
+    setAppliedFilters(filters);
+    setCurrentPage(1);
+  };
+
+  const handleGenreChange = (genre: string, checked: boolean) => {
+    setFilters(prev => ({
+      ...prev,
+      genres: checked
+        ? [...prev.genres, genre]
+        : prev.genres.filter(g => g !== genre)
+    }));
+  };
+
+  const handlePlatformChange = (platform: string, checked: boolean) => {
+    setFilters(prev => ({
+      ...prev,
+      platforms: checked
+        ? [...prev.platforms, platform]
+        : prev.platforms.filter(p => p !== platform)
+    }));
+  };
+
+  const handleYearChange = (year: string, checked: boolean) => {
+    setFilters(prev => ({
+      ...prev,
+      releaseYears: checked
+        ? [...prev.releaseYears, year]
+        : prev.releaseYears.filter(y => y !== year)
+    }));
+  };
 
   return (
     <div className="bg-black h-full text-white flex overflow-hidden">
       {/* Sidebar Filters */}
       <aside className="w-64 hidden md:block p-6 border-r border-gray-800 h-full overflow-y-auto">
-        <div className="mb-8">
+        <div className="mb-6">
           <h2 className="text-2xl font-bold text-white mb-1">Filters</h2>
-          <p className="text-gray-500 text-xs">{games.length} Games found</p>
+          <p className="text-gray-500 text-xs mb-4">{games.length} Games found</p>
+
+          {/* Apply Button */}
+          <button
+            onClick={handleApplyFilters}
+            disabled={!hasFilterChanges}
+            className={`w-full py-2 px-4 rounded font-bold text-sm transition-all duration-200 ${hasFilterChanges
+                ? 'bg-red-600 hover:bg-red-700 text-white shadow-[0_0_10px_rgba(220,38,38,0.5)]'
+                : 'bg-gray-800 text-gray-500 cursor-not-allowed opacity-50'
+              }`}
+          >
+            {hasFilterChanges ? 'Apply Filters' : 'No Changes'}
+          </button>
         </div>
 
         <FilterSection title="Genre">
-          <CheckboxFilter label="Action" />
-          <CheckboxFilter label="RPG" />
-          <CheckboxFilter label="Adventure" />
-          <CheckboxFilter label="Strategy" />
-          <CheckboxFilter label="Simulation" />
-          <CheckboxFilter label="Sports" />
-          <CheckboxFilter label="Racing" />
-          <CheckboxFilter label="Shooter" />
+          {['Action', 'RPG', 'Adventure', 'Strategy', 'Simulation', 'Sports', 'Racing', 'Shooter'].map(genre => (
+            <CheckboxFilter
+              key={genre}
+              label={genre}
+              checked={filters.genres.includes(genre)}
+              onChange={(checked) => handleGenreChange(genre, checked)}
+            />
+          ))}
         </FilterSection>
 
         <FilterSection title="Platform">
-          <CheckboxFilter label="PC" />
-          <CheckboxFilter label="PlayStation" />
-          <CheckboxFilter label="Xbox" />
-          <CheckboxFilter label="Nintendo Switch" />
-          <CheckboxFilter label="Steam Deck" />
+          {['PC', 'PlayStation', 'Xbox', 'Nintendo Switch', 'Steam Deck'].map(platform => (
+            <CheckboxFilter
+              key={platform}
+              label={platform}
+              checked={filters.platforms.includes(platform)}
+              onChange={(checked) => handlePlatformChange(platform, checked)}
+            />
+          ))}
         </FilterSection>
 
         <FilterSection title="Price Range">
           <div className="px-1">
-            <input 
-              type="range" 
-              min="0" 
-              max="100" 
-              value={priceRange} 
-              onChange={(e) => setPriceRange(Number(e.target.value))}
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={filters.maxPrice}
+              onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: Number(e.target.value) }))}
               className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-red-600"
             />
             <div className="flex justify-between mt-2 text-xs text-gray-400">
               <span>$0</span>
-              <span>${priceRange}</span>
+              <span>${filters.maxPrice}</span>
             </div>
           </div>
         </FilterSection>
 
         <FilterSection title="Release Year">
-          <CheckboxFilter label="2025" />
-          <CheckboxFilter label="2024" />
-          <CheckboxFilter label="2023" />
-          <CheckboxFilter label="2022" />
-          <CheckboxFilter label="Older" />
+          {['2025', '2024', '2023', '2022', 'Older'].map(year => (
+            <CheckboxFilter
+              key={year}
+              label={year}
+              checked={filters.releaseYears.includes(year)}
+              onChange={(checked) => handleYearChange(year, checked)}
+            />
+          ))}
         </FilterSection>
 
         <FilterSection title="Rating">
           {[5, 4, 3, 2, 1].map((stars) => (
             <label key={stars} className="flex items-center space-x-3 cursor-pointer group">
               <div className="relative flex items-center">
-                <input type="checkbox" className="peer h-4 w-4 cursor-pointer appearance-none rounded border border-gray-600 bg-gray-900 checked:border-red-600 checked:bg-red-600 transition-all" />
+                <input
+                  type="checkbox"
+                  className="peer h-4 w-4 cursor-pointer appearance-none rounded border border-gray-600 bg-gray-900 checked:border-red-600 checked:bg-red-600 transition-all"
+                  checked={filters.rating === stars}
+                  onChange={(e) => setFilters(prev => ({ ...prev, rating: e.target.checked ? stars : 0 }))}
+                />
                 <svg className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 text-white opacity-0 peer-checked:opacity-100 pointer-events-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="20 6 9 17 4 12"></polyline>
                 </svg>
               </div>
               <div className="flex items-center">
                 {[...Array(5)].map((_, i) => (
-                  <svg 
-                    key={i} 
-                    className={`w-3 h-3 ${i < stars ? 'text-yellow-400' : 'text-gray-700'}`} 
-                    fill="currentColor" 
+                  <svg
+                    key={i}
+                    className={`w-3 h-3 ${i < stars ? 'text-yellow-400' : 'text-gray-700'}`}
+                    fill="currentColor"
                     viewBox="0 0 20 20"
                   >
                     <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
@@ -164,28 +263,26 @@ const GameDeals = () => {
               Game <span className="text-red-600">Deals</span>
             </h1>
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <span className="text-gray-400 text-sm">Show:</span>
-                <select className="bg-gray-900 border border-gray-700 text-white text-sm rounded px-2 py-1 focus:outline-none focus:border-red-600">
-                  <option>20</option>
-                  <option>40</option>
-                  <option>60</option>
-                </select>
-              </div>
+              {/* Removed Entry Count Selection */}
+
               <div className="flex items-center space-x-2">
                 <span className="text-gray-400 text-sm">Sort by:</span>
-                <select className="bg-gray-900 border border-gray-700 text-white text-sm rounded px-3 py-1 focus:outline-none focus:border-red-600">
-                  <option>Featured</option>
-                  <option>Price: Low to High</option>
-                  <option>Price: High to Low</option>
-                  <option>Rating: High to Low</option>
-                  <option>Release Date</option>
+                <select
+                  className="bg-gray-900 border border-gray-700 text-white text-sm rounded px-3 py-1 focus:outline-none focus:border-red-600"
+                  value={filters.sort}
+                  onChange={(e) => setFilters(prev => ({ ...prev, sort: e.target.value }))}
+                >
+                  <option value="featured">Featured</option>
+                  <option value="price_asc">Price: Low to High</option>
+                  <option value="price_desc">Price: High to Low</option>
+                  <option value="rating_desc">Rating: High to Low</option>
+                  <option value="newest">Release Date</option>
                 </select>
               </div>
             </div>
           </div>
         </div>
-        
+
         <div className="flex-1 overflow-y-auto p-4 pt-0 min-h-0 custom-scrollbar">
           {loading ? (
             <div className="text-center py-10 text-white">Loading game deals...</div>
@@ -213,10 +310,10 @@ const GameDeals = () => {
         </div>
 
         {/* Pagination */}
-        <Pagination 
-          currentPage={currentPage} 
-          totalPages={totalPages} 
-          onPageChange={setCurrentPage} 
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
         />
       </main>
     </div>

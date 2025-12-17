@@ -34,6 +34,12 @@ def _migrate_sqlite(engine):
             cursor.execute("ALTER TABLE games ADD COLUMN deal_last_verified DATETIME")
         if 'deal_ends_at' not in columns:
             cursor.execute("ALTER TABLE games ADD COLUMN deal_ends_at DATETIME")
+        if 'platforms' not in columns:
+            cursor.execute("ALTER TABLE games ADD COLUMN platforms VARCHAR(255)")
+        if 'release_date' not in columns:
+            cursor.execute("ALTER TABLE games ADD COLUMN release_date VARCHAR(50)")
+        if 'release_year' not in columns:
+            cursor.execute("ALTER TABLE games ADD COLUMN release_year INTEGER")
 
     if 'deal_history' not in tables:
         cursor.execute("""
@@ -72,6 +78,12 @@ def _migrate_postgres(engine):
                 conn.execute(text("ALTER TABLE games ADD COLUMN deal_last_verified TIMESTAMP WITH TIME ZONE"))
             if 'deal_ends_at' not in cols:
                 conn.execute(text("ALTER TABLE games ADD COLUMN deal_ends_at TIMESTAMP WITH TIME ZONE"))
+            if 'platforms' not in cols:
+                conn.execute(text("ALTER TABLE games ADD COLUMN platforms VARCHAR(255)"))
+            if 'release_date' not in cols:
+                conn.execute(text("ALTER TABLE games ADD COLUMN release_date VARCHAR(50)"))
+            if 'release_year' not in cols:
+                conn.execute(text("ALTER TABLE games ADD COLUMN release_year INTEGER"))
 
         if 'deal_history' not in tables:
             # Use a straightforward CREATE TABLE; id as SERIAL primary key for Postgres
@@ -166,6 +178,8 @@ if __name__ == '__main__':
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-    db = SQLAlchemy(app)
+    from models import db
+    db.init_app(app)
 
-    run_migrations(app)
+    with app.app_context():
+        run_migrations(app)

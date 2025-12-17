@@ -255,6 +255,30 @@ def update_game_details_systematically(limit=5):
                 genres = details.get('genres', [])
                 if genres:
                     game.genres = ",".join([g.get('description', '') for g in genres])
+                
+                # Platforms
+                platforms = details.get('platforms', {})
+                platform_list = []
+                if platforms.get('windows'): platform_list.append('windows')
+                if platforms.get('mac'): platform_list.append('mac')
+                if platforms.get('linux'): platform_list.append('linux')
+                game.platforms = ",".join(platform_list)
+                
+                # Release Date
+                release_date_data = details.get('release_date', {})
+                if isinstance(release_date_data, dict):
+                    date_str = release_date_data.get('date', '')
+                    game.release_date = date_str
+                    # Try to parse year
+                    # content: "Dec 17, 2025" or "2025" etc.
+                    import re
+                    match = re.search(r'\b(19|20)\d{2}\b', date_str)
+                    if match:
+                        try:
+                            game.release_year = int(match.group(0))
+                        except ValueError:
+                            pass
+                    
                     
                 # Requirements
                 pc_req = details.get('pc_requirements', {})

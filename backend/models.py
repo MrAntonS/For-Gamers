@@ -40,6 +40,9 @@ class Game(db.Model):
     deal_last_verified = db.Column(db.DateTime(timezone=True), nullable=True) # When we last verified deal is still active
     deal_ends_at = db.Column(db.DateTime(timezone=True), nullable=True) # When the deal expires (if known)
     genres = db.Column(db.String(512), nullable=True) # Comma separated genres
+    platforms = db.Column(db.String(255), nullable=True) # Comma separated platforms: windows,mac,linux
+    release_date = db.Column(db.String(50), nullable=True) # Raw release date as string
+    release_year = db.Column(db.Integer, nullable=True) # Parsed year
     pc_requirements = db.Column(db.Text, nullable=True) # JSON string or text
     mac_requirements = db.Column(db.Text, nullable=True) # JSON string or text
     linux_requirements = db.Column(db.Text, nullable=True) # JSON string or text
@@ -97,6 +100,9 @@ class Game(db.Model):
             'category': 'Game',
             'brand': 'Steam',
             'genres': self.genres.split(',') if self.genres else [],
+            'platforms': self.platforms.split(',') if self.platforms else [],
+            'releaseDate': self.release_date,
+            'releaseYear': self.release_year,
             'pc_requirements': self.pc_requirements,
             'mac_requirements': self.mac_requirements,
             'linux_requirements': self.linux_requirements
