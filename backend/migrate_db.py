@@ -40,6 +40,15 @@ def _migrate_sqlite(engine):
             cursor.execute("ALTER TABLE games ADD COLUMN release_date VARCHAR(50)")
         if 'release_year' not in columns:
             cursor.execute("ALTER TABLE games ADD COLUMN release_year INTEGER")
+    
+    if 'hardware' in tables:
+        cursor.execute("PRAGMA table_info(hardware)")
+        columns = [row[1] for row in cursor.fetchall()]
+        
+        if 'search_term' not in columns:
+            cursor.execute("ALTER TABLE hardware ADD COLUMN search_term VARCHAR(255)")
+        if 'seller_info' not in columns:
+            cursor.execute("ALTER TABLE hardware ADD COLUMN seller_info TEXT")
 
     if 'deal_history' not in tables:
         cursor.execute("""
@@ -84,6 +93,14 @@ def _migrate_postgres(engine):
                 conn.execute(text("ALTER TABLE games ADD COLUMN release_date VARCHAR(50)"))
             if 'release_year' not in cols:
                 conn.execute(text("ALTER TABLE games ADD COLUMN release_year INTEGER"))
+
+        if 'hardware' in tables:
+            cols = {c['name'] for c in insp.get_columns('hardware')}
+            
+            if 'search_term' not in cols:
+                conn.execute(text("ALTER TABLE hardware ADD COLUMN search_term VARCHAR(255)"))
+            if 'seller_info' not in cols:
+                conn.execute(text("ALTER TABLE hardware ADD COLUMN seller_info TEXT"))
 
         if 'deal_history' not in tables:
             # Use a straightforward CREATE TABLE; id as SERIAL primary key for Postgres

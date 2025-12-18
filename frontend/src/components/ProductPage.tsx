@@ -6,6 +6,7 @@ import { API_BASE_URL } from '../config';
 interface Product {
   id: number;
   steam_id?: number;
+  ebayItemId?: string;
   title: string;
   name?: string;
   price: string;
@@ -21,9 +22,12 @@ interface Product {
   pc_requirements?: string;
   mac_requirements?: string;
   linux_requirements?: string;
-  lastUpdated?: string;
-  dealLastVerified?: string;
   dealEndsAt?: string;
+  dealLastVerified?: string;
+  listings?: Product[];
+  sellerInfo?: any;
+  condition?: string;
+  dealScore?: number;
 }
 
 // Countdown timer component for deal end dates
@@ -92,21 +96,21 @@ const ProductPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { addToCart } = useCart();
-  
+
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
-  
+
   const category = searchParams.get('category') || 'Game';
 
   useEffect(() => {
     const fetchProduct = async () => {
       if (!id) return;
-      
+
       setLoading(true);
       setError(null);
-      
+
       try {
         const response = await fetch(`${API_BASE_URL}/api/products/${id}?category=${category}`);
         if (!response.ok) {
@@ -114,7 +118,7 @@ const ProductPage: React.FC = () => {
         }
         const data = await response.json();
         setProduct(data);
-        
+
         // Trigger background verification for games
         if (category === 'Game') {
           fetch(`${API_BASE_URL}/api/products/${id}/verify?category=${category}`, {
@@ -206,7 +210,7 @@ const ProductPage: React.FC = () => {
                 className="w-full h-full object-cover"
                 onError={() => setImageError(true)}
               />
-              
+
               {/* Category Badge */}
               <div className="absolute top-4 left-4 bg-red-600 text-white text-sm font-bold px-3 py-1 rounded-lg">
                 {product.category}
@@ -302,9 +306,9 @@ const ProductPage: React.FC = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <span className="text-sm font-medium">
-                      Deal ends: {new Date(product.dealEndsAt).toLocaleDateString('en-US', { 
-                        month: 'short', 
-                        day: 'numeric', 
+                      Deal ends: {new Date(product.dealEndsAt).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
                         year: 'numeric',
                         hour: '2-digit',
                         minute: '2-digit'
@@ -319,7 +323,7 @@ const ProductPage: React.FC = () => {
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                {product.dealLastVerified 
+                {product.dealLastVerified
                   ? `Deal verified: ${new Date(product.dealLastVerified).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
                   : "This deal hasn't been verified yet"
                 }
@@ -346,6 +350,55 @@ const ProductPage: React.FC = () => {
               </div>
             )}
 
+            {/* Hardware Deals List */}
+            {product.listings && product.listings.length > 0 && (
+              <div className="mb-8">
+                <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                  Available Deals
+                  <span className="bg-gray-800 text-gray-300 text-xs px-2 py-1 rounded-full">{product.listings.length}</span>
+                </h2>
+                <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+                  {product.listings.map((item, idx) => (
+                    <div key={item.id || idx} className="p-4 border-b border-gray-800 last:border-0 flex items-center gap-4 hover:bg-gray-800/50 transition-colors">
+                      {/* Image */}
+                      <div className="w-16 h-16 bg-gray-800 rounded-lg overflow-hidden shrink-0">
+                        <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-white truncate text-sm">{item.title}</h3>
+                        <div className="flex items-center gap-3 text-xs text-gray-400 mt-1">
+                          {item.condition && <span className="bg-gray-800 px-2 py-0.5 rounded">{item.condition}</span>}
+                          {item.sellerInfo && (
+                            <span>Seller: {item.sellerInfo.username} ({item.sellerInfo.feedbackScore})</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Price & Action */}
+                      <div className="text-right shrink-0">
+                        <div className="font-bold text-red-500 text-lg">{item.price}</div>
+                        <button
+                          onClick={() => {
+                            // eBay item ID is in format: v1|<itemId>|0
+                            const parts = item.ebayItemId?.split('|');
+                            const itemId = parts && parts.length >= 2 ? parts[1] : item.ebayItemId;
+                            if (itemId) {
+                              window.open(`https://ebay.com/itm/${itemId}`, '_blank');
+                            }
+                          }}
+                          className="text-xs bg-white text-black font-bold px-3 py-1.5 rounded hover:bg-gray-200 mt-1"
+                        >
+                          View Deal
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Steam Link (for games) */}
             {product.steam_id && (
               <a
@@ -355,7 +408,7 @@ const ProductPage: React.FC = () => {
                 className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.879V14.89l-2.54 1.04a.75.75 0 01-.958-.344l-.5-.866a.75.75 0 01.344-.958l3.108-1.27a2.25 2.25 0 011.716 0l3.108 1.27a.75.75 0 01.344.958l-.5.866a.75.75 0 01-.958.344l-2.54-1.04v6.989C18.343 21.128 22 16.991 22 12c0-5.523-4.477-10-10-10z"/>
+                  <path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.879V14.89l-2.54 1.04a.75.75 0 01-.958-.344l-.5-.866a.75.75 0 01.344-.958l3.108-1.27a2.25 2.25 0 011.716 0l3.108 1.27a.75.75 0 01.344.958l-.5.866a.75.75 0 01-.958.344l-2.54-1.04v6.989C18.343 21.128 22 16.991 22 12c0-5.523-4.477-10-10-10z" />
                 </svg>
                 View on Steam
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -391,7 +444,7 @@ const SystemRequirements: React.FC<{ requirements: string }> = ({ requirements }
       <div className="mt-12 border-t border-gray-800 pt-8">
         <h2 className="text-2xl font-bold text-white mb-6">System Requirements</h2>
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-          <div 
+          <div
             className="text-gray-400 prose prose-invert max-w-none prose-headings:text-white prose-strong:text-white"
             dangerouslySetInnerHTML={{ __html: requirements }}
           />
@@ -462,7 +515,7 @@ const SystemRequirements: React.FC<{ requirements: string }> = ({ requirements }
 
   const renderRequirementSection = (title: string, reqs: Record<string, string> | undefined, accentColor: string) => {
     if (!reqs) return null;
-    
+
     return (
       <div className="flex-1 min-w-[280px]">
         <div className={`flex items-center gap-2 mb-4 pb-2 border-b border-gray-700`}>
