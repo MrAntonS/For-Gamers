@@ -35,10 +35,12 @@ jobs:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
-          EBAY_API_KEY: ${{ secrets.EBAY_API_KEY }}
+          EBAY_CLIENT_ID: ${{ secrets.EBAY_CLIENT_ID }}
+          EBAY_CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
+          EBAY_API_ENV: ${{ secrets.EBAY_API_ENV }}
         run: |
           set -euo pipefail
-          for v in SSH_PRIVATE_KEY ORACLE_VM_IP ORACLE_VM_USER DB_PASSWORD SECRET_KEY STEAM_API_KEY EBAY_API_KEY; do
+          for v in SSH_PRIVATE_KEY ORACLE_VM_IP ORACLE_VM_USER DB_PASSWORD SECRET_KEY STEAM_API_KEY EBAY_CLIENT_ID EBAY_CLIENT_SECRET EBAY_API_ENV; do
             if [ -z "${!v}" ]; then
               echo "Missing required secret: $v" >&2
               exit 1
@@ -71,7 +73,9 @@ jobs:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
-          EBAY_API_KEY: ${{ secrets.EBAY_API_KEY }}
+          EBAY_CLIENT_ID: ${{ secrets.EBAY_CLIENT_ID }}
+          EBAY_CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
+          EBAY_API_ENV: ${{ secrets.EBAY_API_ENV }}
           DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}
         run: |
           set -euo pipefail
@@ -79,11 +83,13 @@ jobs:
           SECRET_KEY_B64="$(printf '%s' "$SECRET_KEY" | base64 -w0)"
           POSTGRES_PASSWORD_B64="$(printf '%s' "$DB_PASSWORD" | base64 -w0)"
           STEAM_API_KEY_B64="$(printf '%s' "$STEAM_API_KEY" | base64 -w0)"
-          EBAY_API_KEY_B64="$(printf '%s' "$EBAY_API_KEY" | base64 -w0)"
+          EBAY_CLIENT_ID_B64="$(printf '%s' "$EBAY_CLIENT_ID" | base64 -w0)"
+          EBAY_CLIENT_SECRET_B64="$(printf '%s' "$EBAY_CLIENT_SECRET" | base64 -w0)"
+          EBAY_API_ENV_B64="$(printf '%s' "$EBAY_API_ENV" | base64 -w0)"
 
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
             ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }} \
-            "DEPLOY_ENV='$DEPLOY_ENV' SECRET_KEY_B64='$SECRET_KEY_B64' POSTGRES_PASSWORD_B64='$POSTGRES_PASSWORD_B64' STEAM_API_KEY_B64='$STEAM_API_KEY_B64' EBAY_API_KEY_B64='$EBAY_API_KEY_B64' bash -s" << 'EOF'
+            "DEPLOY_ENV='$DEPLOY_ENV' SECRET_KEY_B64='$SECRET_KEY_B64' POSTGRES_PASSWORD_B64='$POSTGRES_PASSWORD_B64' STEAM_API_KEY_B64='$STEAM_API_KEY_B64' EBAY_CLIENT_ID_B64='$EBAY_CLIENT_ID_B64' EBAY_CLIENT_SECRET_B64='$EBAY_CLIENT_SECRET_B64' EBAY_API_ENV_B64='$EBAY_API_ENV_B64' bash -s" << 'EOF'
             set -euo pipefail
 
             decode() { printf '%s' "$1" | base64 -d; }
@@ -126,7 +132,9 @@ jobs:
               printf 'SECRET_KEY=%s\n' "$(decode "$SECRET_KEY_B64")"
               printf 'POSTGRES_PASSWORD=%s\n' "$(decode "$POSTGRES_PASSWORD_B64")"
               printf 'STEAM_API_KEY=%s\n' "$(decode "$STEAM_API_KEY_B64")"
-              printf 'EBAY_API_KEY=%s\n' "$(decode "$EBAY_API_KEY_B64")"
+              printf 'EBAY_CLIENT_ID=%s\n' "$(decode "$EBAY_CLIENT_ID_B64")"
+              printf 'EBAY_CLIENT_SECRET=%s\n' "$(decode "$EBAY_CLIENT_SECRET_B64")"
+              printf 'EBAY_API_ENV=%s\n' "$(decode "$EBAY_API_ENV_B64")"
             } > .env
 
             # Load new images
