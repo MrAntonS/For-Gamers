@@ -166,6 +166,11 @@ def create_app():
         app.register_blueprint(external.external_bp)
 
     # Start background thread
+    # IMPORTANT: In production with Gunicorn, we use a separate worker process (background_worker.py)
+    # This thread is only for development mode when running Flask directly
+    # Check if we're running under Gunicorn
+    is_gunicorn = "gunicorn" in os.environ.get("SERVER_SOFTWARE", "")
+    
     # When Flask debug reloader is on, only start the background thread in the
     # reloader's main process to avoid running it twice.
     debug_mode = (
@@ -173,7 +178,10 @@ def create_app():
         or os.environ.get("FLASK_ENV") == "development"
     )
 
-    if (not debug_mode) or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+    # Only start background thread if:
+    # 1. NOT running under Gunicorn (production uses separate worker)
+    # 2. In debug mode, only in the main reloader process
+    if not is_gunicorn and ((not debug_mode) or os.environ.get("WERKZEUG_RUN_MAIN") == "true"):
         # Check if thread is already running to avoid duplicates in same process
         is_running = False
         for t in threading.enumerate():
@@ -183,7 +191,7 @@ def create_app():
         
         if not is_running:
             # Use file-based lock to prevent multiple processes from starting the task
-            # This handles Gunicorn workers or multiple Flask processes
+            # This handles multiple Flask processes in development
             lock_file = os.path.join(app.instance_path, '.background_task.lock')
             
             try:
@@ -219,6 +227,8 @@ def create_app():
                     print("Background Steam fetch thread started (acquired lock - Windows)")
                 except (IOError, OSError, ImportError):
                     print("Background task already running in another process, skipping")
+    elif is_gunicorn:
+        print("Running under Gunicorn - background tasks handled by separate worker process")
 
     return app
 

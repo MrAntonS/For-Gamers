@@ -29,6 +29,29 @@ services:
     depends_on:
       - db
 
+  # Background worker for Steam and eBay updates
+  worker:
+    image: gamer-nexus-backend:latest
+    command: ["python", "background_worker.py"]
+    volumes:
+      - ./logs:/app/logs
+    environment:
+      - FLASK_ENV=production
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=db
+      - POSTGRES_DB=gamernexus
+      - STEAM_API_KEY=${STEAM_API_KEY}
+      - EBAY_CLIENT_ID=${EBAY_CLIENT_ID}
+      - EBAY_CLIENT_SECRET=${EBAY_CLIENT_SECRET}
+      - EBAY_API_ENV=${EBAY_API_ENV}
+      - LOG_DIR=/app/logs
+      - LOG_FILE=/app/logs/worker.log
+      - REDIRECT_STDOUT_TO_LOG=0
+    depends_on:
+      - db
+    restart: unless-stopped
+
   db:
     image: postgres:15-alpine
     volumes:
