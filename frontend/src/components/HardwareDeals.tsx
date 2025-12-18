@@ -83,7 +83,7 @@ const HardwareDeals = () => {
         const queryParams = new URLSearchParams({
           category: 'Hardware',
           page: currentPage.toString(),
-          limit: '48',
+          limit: '10',
           min_price: appliedFilters.minPrice.toString(),
           max_price: appliedFilters.maxPrice.toString(),
           rating: appliedFilters.rating.toString(),
@@ -139,8 +139,8 @@ const HardwareDeals = () => {
             onClick={handleApplyFilters}
             disabled={!hasFilterChanges}
             className={`w-full py-2 px-4 rounded font-bold text-sm transition-all duration-200 ${hasFilterChanges
-                ? 'bg-red-600 hover:bg-red-700 text-white shadow-[0_0_10px_rgba(220,38,38,0.5)]'
-                : 'bg-gray-800 text-gray-500 cursor-not-allowed opacity-50'
+              ? 'bg-red-600 hover:bg-red-700 text-white shadow-[0_0_10px_rgba(220,38,38,0.5)]'
+              : 'bg-gray-800 text-gray-500 cursor-not-allowed opacity-50'
               }`}
           >
             {hasFilterChanges ? 'Apply Filters' : 'No Changes'}

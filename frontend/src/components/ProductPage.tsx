@@ -6,6 +6,7 @@ import { API_BASE_URL } from '../config';
 interface Product {
   id: number;
   steam_id?: number;
+  ebayItemId?: string;
   title: string;
   name?: string;
   price: string;
@@ -22,6 +23,7 @@ interface Product {
   mac_requirements?: string;
   linux_requirements?: string;
   dealEndsAt?: string;
+  dealLastVerified?: string;
   listings?: Product[];
   sellerInfo?: any;
   condition?: string;
@@ -378,7 +380,14 @@ const ProductPage: React.FC = () => {
                       <div className="text-right shrink-0">
                         <div className="font-bold text-red-500 text-lg">{item.price}</div>
                         <button
-                          onClick={() => window.open(`https://ebay.com/itm/${item.id}`, '_blank')}
+                          onClick={() => {
+                            // eBay item ID is in format: v1|<itemId>|0
+                            const parts = item.ebayItemId?.split('|');
+                            const itemId = parts && parts.length >= 2 ? parts[1] : item.ebayItemId;
+                            if (itemId) {
+                              window.open(`https://ebay.com/itm/${itemId}`, '_blank');
+                            }
+                          }}
                           className="text-xs bg-white text-black font-bold px-3 py-1.5 rounded hover:bg-gray-200 mt-1"
                         >
                           View Deal
