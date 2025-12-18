@@ -146,7 +146,9 @@ const ProductPage: React.FC = () => {
         originalPrice: product.originalPrice,
         image: product.image,
         category: product.category,
-        brand: product.brand
+        brand: product.brand,
+        steam_id: product.steam_id,
+        ebayItemId: product.ebayItemId
       });
     }
   };

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useCart } from '../contexts/CartContext';
+import { useNavigate } from 'react-router-dom';
 import { FaTrash, FaTimes } from 'react-icons/fa';
 
 interface CartProps {
@@ -9,17 +10,18 @@ interface CartProps {
 
 const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
   const { cartItems, removeFromCart, updateQuantity, clearCart, cartTotal, cartCount } = useCart();
+  const navigate = useNavigate();
 
   if (!isOpen) return null;
 
   return (
     <>
       {/* Backdrop */}
-      <div 
+      <div
         className="fixed inset-0 bg-black/50 z-40"
         onClick={onClose}
       />
-      
+
       {/* Cart Panel */}
       <div className="fixed right-0 top-0 h-full w-full md:w-96 bg-gray-900 shadow-xl z-50 flex flex-col">
         {/* Header */}
@@ -27,7 +29,7 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
           <h2 className="text-xl font-bold text-white">
             Shopping Cart {cartCount > 0 && `(${cartCount})`}
           </h2>
-          <button 
+          <button
             onClick={onClose}
             className="text-gray-400 hover:text-white transition-colors"
           >
@@ -50,8 +52,8 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
               {cartItems.map((item) => (
                 <div key={item.id} className="bg-gray-800 rounded-lg p-3 border border-gray-700">
                   <div className="flex gap-3">
-                    <img 
-                      src={item.image} 
+                    <img
+                      src={item.image}
                       alt={item.name}
                       className="w-20 h-20 object-cover rounded"
                     />
@@ -66,7 +68,7 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center justify-between mt-3">
                     <div className="flex items-center gap-2">
                       <button
@@ -104,12 +106,18 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
               <span className="text-gray-400">Total:</span>
               <span className="text-white font-bold">${cartTotal.toFixed(2)}</span>
             </div>
-            
-            <button className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded transition-colors">
+
+            <button
+              onClick={() => {
+                navigate('/checkout');
+                onClose();
+              }}
+              className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded transition-colors"
+            >
               Checkout
             </button>
-            
-            <button 
+
+            <button
               onClick={clearCart}
               className="w-full bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 rounded transition-colors text-sm"
             >

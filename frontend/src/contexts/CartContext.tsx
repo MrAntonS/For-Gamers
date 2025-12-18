@@ -11,6 +11,8 @@ export interface CartItem {
   category: string;
   quantity: number;
   brand?: string;
+  steam_id?: number;
+  ebayItemId?: string;
 }
 
 interface CartContextType {
@@ -112,7 +114,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
-  
+
   const cartTotal = cartItems.reduce((total, item) => {
     const price = parsePrice(item.price);
     return total + (price * item.quantity);
