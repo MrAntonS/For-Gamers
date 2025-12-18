@@ -139,3 +139,105 @@ class DealHistory(db.Model):
             'isActive': self.is_active,
             'recordedAt': self.recorded_at.isoformat() if self.recorded_at else None
         }
+
+
+class Hardware(db.Model):
+    """
+    Stores hardware products fetched from eBay API.
+    Includes gaming hardware like GPUs, consoles, peripherals, etc.
+    """
+    __tablename__ = 'hardware'
+
+    id = db.Column(db.Integer, primary_key=True)
+    ebay_item_id = db.Column(db.String(50), unique=True, nullable=False)  # eBay's unique item ID
+    title = db.Column(db.String(255), nullable=False)
+    price = db.Column(db.Float, nullable=True)
+    original_price = db.Column(db.Float, nullable=True)  # MSRP or list price if available
+    currency = db.Column(db.String(10), default='USD')
+    discount = db.Column(db.Integer, default=0)  # Percentage discount
+    image_url = db.Column(db.String(512), nullable=True)
+    description = db.Column(db.Text, nullable=True)
+    condition = db.Column(db.String(50), nullable=True)  # New, Used, Refurbished, etc.
+    category_name = db.Column(db.String(100), nullable=True)  # GPU, Console, Peripheral, etc.
+    brand = db.Column(db.String(100), nullable=True)  # NVIDIA, AMD, Sony, Microsoft, etc.
+    seller_info = db.Column(db.Text, nullable=True)  # JSON string with seller details
+    shipping_cost = db.Column(db.Float, nullable=True)
+    is_active = db.Column(db.Boolean, default=True)  # Whether the listing is still active
+    deal_ends_at = db.Column(db.DateTime(timezone=True), nullable=True)  # Listing end time
+    last_updated = db.Column(db.DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    def calculate_deal_score(self):
+        """
+        Calculate a deal score for hardware based on discount, condition, and price.
+        Higher scores = better deals.
+        """
+        import math
+        
+        # Base score from discount
+        discount_pct = self.discount or 0
+        discount_score = min(discount_pct / 100.0, 0.5)  # Max 0.5 from discount
+        
+        # Condition bonus (prefer new items)
+        condition_bonus = 0.3
+        if self.condition:
+            condition_lower = self.condition.lower()
+            if 'new' in condition_lower:
+                condition_bonus = 0.5
+            elif 'refurbished' in condition_lower or 'certified' in condition_lower:
+                condition_bonus = 0.4
+            elif 'used' in condition_lower:
+                # Better condition used items score higher
+                if 'excellent' in condition_lower or 'like new' in condition_lower:
+                    condition_bonus = 0.35
+                elif 'good' in condition_lower or 'very good' in condition_lower:
+                    condition_bonus = 0.25
+                else:
+                    condition_bonus = 0.15
+        
+        # Savings in dollars (capped to prevent huge items dominating)
+        original = self.original_price or self.price or 0
+        current = self.price or 0
+        savings = max(original - current, 0)
+        savings_factor = min(savings / 50.0, 0.3)  # Max 0.3 from savings
+        
+        # Free shipping bonus
+        shipping_bonus = 0.1 if (self.shipping_cost is None or self.shipping_cost == 0) else 0
+        
+        # Combine scores
+        total_score = (discount_score + condition_bonus + savings_factor + shipping_bonus) * 100
+        
+        return round(total_score, 1)
+
+    def to_dict(self):
+        import json
+        
+        # Parse seller info if it's JSON string
+        seller_data = None
+        if self.seller_info:
+            try:
+                seller_data = json.loads(self.seller_info)
+            except:
+                seller_data = None
+        
+        return {
+            'id': self.id,
+            'ebayItemId': self.ebay_item_id,
+            'title': self.title,
+            'price': f"${self.price:.2f}" if self.price is not None else None,
+            'originalPrice': f"${self.original_price:.2f}" if self.original_price is not None else None,
+            'currency': self.currency,
+            'discount': f"-{self.discount}%" if self.discount > 0 else "",
+            'image': self.image_url,
+            'description': self.description,
+            'condition': self.condition,
+            'dealScore': self.calculate_deal_score(),
+            'isActive': self.is_active,
+            'lastUpdated': self.last_updated.isoformat() if self.last_updated else None,
+            'dealEndsAt': self.deal_ends_at.isoformat() if self.deal_ends_at else None,
+            'category': 'Hardware',
+            'categoryName': self.category_name,
+            'brand': self.brand,
+            'sellerInfo': seller_data,
+            'shippingCost': f"${self.shipping_cost:.2f}" if self.shipping_cost is not None else "Free",
+            'rating': None  # eBay items don't have ratings in the same way
+        }

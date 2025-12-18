@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from services.steam_service import search_steam_games, get_steam_featured, get_steam_game_details, save_game_to_db
-from services.ebay_service import search_ebay_products
+from services.ebay_service import search_ebay_hardware
 
 external_bp = Blueprint('external_bp', __name__)
 
@@ -36,5 +36,9 @@ def ebay_search():
     if not query:
         return jsonify({"error": "Query parameter is required"}), 400
     
-    results = search_ebay_products(query)
-    return jsonify(results)
+    # Use the new search function and return the raw eBay items
+    items = search_ebay_hardware(query, limit=10)
+    if items is None:
+        return jsonify({"error": "eBay API error or credentials not configured"}), 500
+    
+    return jsonify({"items": items, "total": len(items)})

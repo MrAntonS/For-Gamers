@@ -22,6 +22,7 @@ interface Filters {
   brands: string[];
   genres: string[];
   platforms: string[];
+  years: number[];
   rating: number;
   sort: string;
 }
@@ -29,6 +30,7 @@ interface Filters {
 interface FilterOptions {
   genres: string[];
   platforms: string[];
+  years: number[];
   brands: string[];
   categories: string[];
   price_min: number;
@@ -72,6 +74,7 @@ const ProductList = () => {
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
     genres: [],
     platforms: [],
+    years: [],
     brands: [],
     categories: [],
     price_min: 0,
@@ -86,6 +89,7 @@ const ProductList = () => {
     brands: [],
     genres: [],
     platforms: [],
+    years: [],
     rating: 0,
     sort: 'featured'
   });
@@ -130,7 +134,8 @@ const ProductList = () => {
           categories: appliedFilters.categories.join(','),
           brands: appliedFilters.brands.join(','),
           genres: appliedFilters.genres.join(','),
-          platforms: appliedFilters.platforms.join(',')
+          platforms: appliedFilters.platforms.join(','),
+          years: appliedFilters.years.join(',')
         });
 
         const response = await fetch(`${API_BASE_URL}/api/products?${queryParams.toString()}`);
@@ -191,6 +196,15 @@ const ProductList = () => {
     }));
   };
 
+  const handleYearChange = (year: number, checked: boolean) => {
+    setFilters(prev => ({
+      ...prev,
+      years: checked
+        ? [...prev.years, year]
+        : prev.years.filter(y => y !== year)
+    }));
+  };
+
   return (
     <div className="bg-black h-full text-white flex overflow-hidden">
       {/* Sidebar Filters */}
@@ -244,6 +258,19 @@ const ProductList = () => {
                 label={platform}
                 checked={filters.platforms.includes(platform)}
                 onChange={(checked) => handlePlatformChange(platform, checked)}
+              />
+            ))}
+          </FilterSection>
+        )}
+
+        {filterOptions.years.length > 0 && (
+          <FilterSection title="Release Year">
+            {filterOptions.years.map(year => (
+              <CheckboxFilter
+                key={year}
+                label={year.toString()}
+                checked={filters.years.includes(year)}
+                onChange={(checked) => handleYearChange(year, checked)}
               />
             ))}
           </FilterSection>

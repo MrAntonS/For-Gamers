@@ -9,54 +9,10 @@ from services.steam_service import (
     fetch_cheapshark_deals,
     verify_deal_on_steam,
 )
-from models import Game, DealHistory, db
+from models import Game, DealHistory, Hardware, db
 from sqlalchemy import or_
 
 products_bp = Blueprint('products_bp', __name__)
-
-# Module-level mock data for reuse
-FULL_MOCK_HARDWARE = [
-    {
-        "id": 101, "name": "RTX 4070 Ti", "price": 799.99, "originalPrice": 899.99,
-        "category": "Hardware", "brand": "NVIDIA", "rating": 4.8, "image": "https://images.unsplash.com/photo-1591488320449-011701bb6704?auto=format&fit=crop&w=400&q=80",
-        "description": "Powerful graphics card."
-    },
-    {
-        "id": 102, "name": "Gaming Mouse Pro", "price": 49.99, "originalPrice": 89.99,
-        "category": "Hardware", "brand": "Logitech", "rating": 4.6, "image": "https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?auto=format&fit=crop&w=400&q=80",
-        "description": "High precision mouse."
-    },
-    {
-        "id": 103, "name": "Mechanical Keyboard", "price": 129.99, "originalPrice": 159.99,
-        "category": "Hardware", "brand": "Corsair", "rating": 4.7, "image": "https://images.unsplash.com/photo-1587829741301-dc798b91a603?auto=format&fit=crop&w=400&q=80",
-        "description": "Clicky keys."
-    },
-    {
-        "id": 104, "name": "Xbox Series X", "price": 449.99, "originalPrice": 499.99,
-        "category": "Hardware", "brand": "Microsoft", "rating": 4.8, "image": "https://images.unsplash.com/photo-1621259182978-fbf93132d53d?auto=format&fit=crop&w=400&q=80",
-        "description": "Next-gen console."
-    },
-    {
-        "id": 105, "name": "PlayStation 5", "price": 499.99, "originalPrice": 499.99,
-        "category": "Hardware", "brand": "Sony", "rating": 4.9, "image": "https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?auto=format&fit=crop&w=400&q=80",
-        "description": "Play Has No Limits."
-    },
-    {
-        "id": 106, "name": "Nintendo Switch OLED", "price": 349.99, "originalPrice": 349.99,
-        "category": "Hardware", "brand": "Nintendo", "rating": 4.7, "image": "https://images.unsplash.com/photo-1578303512597-81e6cc155b3e?auto=format&fit=crop&w=400&q=80",
-        "description": "Vibrant screen."
-    },
-    {
-        "id": 107, "name": "Gaming Headset", "price": 79.99, "originalPrice": 99.99,
-        "category": "Hardware", "brand": "Razer", "rating": 4.4, "image": "https://images.unsplash.com/photo-1618366712010-f4ae9c647dcb?auto=format&fit=crop&w=400&q=80",
-        "description": "Surround sound."
-    },
-        {
-        "id": 108, "name": "4K Gaming Monitor", "price": 399.99, "originalPrice": 499.99,
-        "category": "Hardware", "brand": "LG", "rating": 4.7, "image": "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=400&q=80",
-        "description": "Stunning visuals."
-    }
-]
 
 @products_bp.route('/api/products')
 def get_products():
@@ -80,6 +36,9 @@ def get_products():
     
     genres_filter = request.args.get('genres', '')
     genres_list = genres_filter.split(',') if genres_filter else []
+    
+    years_filter = request.args.get('years', '')
+    years_list = [int(y) for y in years_filter.split(',') if y.isdigit()]
     
     brands_filter = request.args.get('brands', '')
     brands_list = brands_filter.split(',') if brands_filter else []
@@ -108,7 +67,7 @@ def get_products():
             fetch_hardware = False
 
     # Implicitly disable hardware if filtering by game-specific attributes
-    if genres_list or platforms_list:
+    if genres_list or platforms_list or years_list:
         fetch_hardware = False
         
     # Filter Games by Brand (All games are currently assumed to be 'Steam')
@@ -136,39 +95,30 @@ def get_products():
             # AND logic: Game must match ALL selected platforms
             for p in platforms_list:
                 query = query.filter(Game.platforms.ilike(f'%{p}%'))
+
+        if years_list:
+            # OR logic: Game must match ANY of the selected years
+            query = query.filter(Game.release_year.in_(years_list))
             
         games_list = query.all()
         games_data = [g.to_dict() for g in games_list]
 
-    # --- Fetch and Filter Hardware (Mock) ---
+    # --- Fetch and Filter Hardware (Database) ---
     hardware_data = []
     if fetch_hardware:
-        for item in FULL_MOCK_HARDWARE:
-            # Price Filter
-            if not (min_price <= item['price'] <= max_price):
-                continue
-            # Rating Filter
-            if item['rating'] < rating_min:
-                continue
-            # Brand Filter
-            if brands_list and item['brand'] not in brands_list:
-                continue
-            
-            hardware_item = {
-                'id': item['id'],
-                'title': item['name'],
-                'price': f"${item['price']:.2f}",
-                'originalPrice': f"${item['originalPrice']:.2f}",
-                'category': item['category'],
-                'discount': f"-{int((1 - item['price']/item['originalPrice'])*100)}%" if item['originalPrice'] > item['price'] else "",
-                'image': item['image'],
-                'rating': item['rating'],
-                'brand': item['brand'],
-                'description': item['description'],
-                'dealLastVerified': None,
-                'dealScore': item['rating'] * 20 # Mock score
-            }
-            hardware_data.append(hardware_item)
+        query = Hardware.query.filter(Hardware.is_active == True)
+        
+        if min_price > 0:
+            query = query.filter(Hardware.price >= min_price)
+        if max_price < 10000:
+            query = query.filter(Hardware.price <= max_price)
+        
+        # Brand filter
+        if brands_list:
+            query = query.filter(Hardware.brand.in_(brands_list))
+        
+        hardware_list = query.all()
+        hardware_data = [h.to_dict() for h in hardware_list]
 
     # --- Combine and Sort ---
     all_products = games_data + hardware_data
@@ -218,6 +168,7 @@ def get_filters():
 
     genres_set = set()
     platforms_set = set()
+    years_set = set()
     
     # Track min/max price
     # Start with extreme values
@@ -236,29 +187,35 @@ def get_filters():
         if g.platforms:
             for platform in g.platforms.split(','):
                 platforms_set.add(platform.strip())
+
+        # Years
+        if g.release_year:
+            years_set.add(g.release_year)
                 
         # Price
         p = g.price if g.price is not None else 0
         if p < min_p: min_p = p
         if p > max_p: max_p = p
 
-    # 2. Process Mock Hardware
+    # 2. Process Hardware from Database
     hardware_brands_set = set()
     hardware_categories_set = set()
     
-    has_hardware = len(FULL_MOCK_HARDWARE) > 0
+    hardware_items = Hardware.query.filter(Hardware.is_active == True).all()
+    has_hardware = len(hardware_items) > 0
     
-    for item in FULL_MOCK_HARDWARE:
+    for item in hardware_items:
         # Brands
-        if 'brand' in item:
-            hardware_brands_set.add(item['brand'])
+        if item.brand:
+            hardware_brands_set.add(item.brand)
         
         # Categories
-        if 'category' in item:
-            hardware_categories_set.add(item['category'])
+        if item.category_name:
+            hardware_categories_set.add(item.category_name)
+        hardware_categories_set.add('Hardware')  # General category
             
         # Price
-        p = item['price'] if item.get('price') is not None else 0
+        p = item.price if item.price is not None else 0
         if p < min_p: min_p = p
         if p > max_p: max_p = p
 
@@ -279,6 +236,7 @@ def get_filters():
     return jsonify({
         "genres": sorted(list(genres_set)),
         "platforms": sorted(list(platforms_set)),
+        "years": sorted(list(years_set), reverse=True),
         "brands": sorted(brands),
         "categories": sorted(categories),
         "price_min": min_p,
@@ -294,23 +252,10 @@ def get_product(product_id):
     category = request.args.get('category', 'Game')
     
     if category == 'Hardware':
-        # Search in mock hardware
-        item = next((item for item in FULL_MOCK_HARDWARE if item['id'] == product_id), None)
-        if item:
-            return jsonify({
-                'id': item['id'],
-                'title': item['name'],
-                'price': f"${item['price']:.2f}",
-                'originalPrice': f"${item['originalPrice']:.2f}",
-                'category': item['category'],
-                'discount': f"-{int((1 - item['price']/item['originalPrice'])*100)}%" if item['originalPrice'] > item['price'] else "",
-                'image': item['image'],
-                'rating': item['rating'],
-                'brand': item['brand'],
-                'description': item['description'],
-                'dealLastVerified': None,
-                'dealScore': item['rating'] * 20
-            })
+        # Search in Hardware database
+        hardware = Hardware.query.get(product_id)
+        if hardware:
+            return jsonify(hardware.to_dict())
         return jsonify({"error": "Product not found"}), 404
         
     else:
@@ -319,21 +264,10 @@ def get_product(product_id):
         if game:
             return jsonify(game.to_dict())
             
-        # Fallback: Check mock hardware if not found in Games (in case category arg is wrong/missing)
-        item = next((item for item in FULL_MOCK_HARDWARE if item['id'] == product_id), None)
-        if item:
-             return jsonify({
-                'id': item['id'],
-                'title': item['name'],
-                'price': f"${item['price']:.2f}",
-                'originalPrice': f"${item['originalPrice']:.2f}",
-                'category': item['category'],
-                'discount': f"-{int((1 - item['price']/item['originalPrice'])*100)}%" if item['originalPrice'] > item['price'] else "",
-                'image': item['image'],
-                'rating': item['rating'],
-                'brand': item['brand'],
-                'description': item['description']
-            })
+        # Fallback: Check hardware if not found in Games (in case category arg is wrong/missing)
+        hardware = Hardware.query.get(product_id)
+        if hardware:
+            return jsonify(hardware.to_dict())
             
         return jsonify({"error": "Product not found"}), 404
 

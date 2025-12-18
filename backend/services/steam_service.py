@@ -210,6 +210,26 @@ def save_game_to_db(item_data):
         
         game.image_url = item_data.get('header_image') or item_data.get('large_capsule_image') or item_data.get('tiny_image')
         
+        # Try to parse release year if available in initial payload
+        # Some Steam APIs provide release_date as a string or a dict
+        release_date_raw = item_data.get('release_date')
+        if release_date_raw:
+            date_str = ""
+            if isinstance(release_date_raw, dict):
+                date_str = release_date_raw.get('date', '')
+            elif isinstance(release_date_raw, str):
+                date_str = release_date_raw
+            
+            if date_str:
+                game.release_date = date_str
+                import re
+                match = re.search(r'\b(19|20)\d{2}\b', date_str)
+                if match:
+                    try:
+                        game.release_year = int(match.group(0))
+                    except ValueError:
+                        pass
+
         db.session.add(game)
         db.session.commit()
         return game
@@ -218,22 +238,26 @@ def save_game_to_db(item_data):
         print(f"Error saving game {item_data.get('id')}: {e}")
         return None
 
-def update_game_details_systematically(limit=5):
+def update_game_details_systematically(limit=50):
     """
-    Find games with missing details (e.g. description or requirements) and fetch them.
+    Find games with missing details (e.g. description, requirements, or release year) and fetch them.
     """
     # Check if we're rate limited before starting
     if not steam_rate_limiter.can_make_request():
         print("Steam API rate limited, skipping game details update")
         return 0
     
-    # Update games that are missing description OR missing pc_requirements OR have raw HTML in requirements
+    # Update games that are missing:
+    # 1. Description
+    # 2. Release Year
+    # 3. PC Requirements (or if they contain raw HTML)
     games_needing_update = Game.query.filter(
         (Game.description == None) | (Game.description == '') | 
+        (Game.release_year == None) |
         (Game.pc_requirements == None) | (Game.pc_requirements == '') |
         (Game.pc_requirements.like('%<strong>%')) | # Catch raw HTML
         (Game.pc_requirements.like('%<li>%'))       # Catch raw HTML
-    ).limit(limit).all()
+    ).order_by(Game.last_updated.asc()).limit(limit).all()
     
     updated_count = 0
     for game in games_needing_update:
@@ -268,15 +292,21 @@ def update_game_details_systematically(limit=5):
                 release_date_data = details.get('release_date', {})
                 if isinstance(release_date_data, dict):
                     date_str = release_date_data.get('date', '')
-                    game.release_date = date_str
-                    # Try to parse year
-                    # content: "Dec 17, 2025" or "2025" etc.
-                    import re
-                    match = re.search(r'\b(19|20)\d{2}\b', date_str)
-                    if match:
-                        try:
-                            game.release_year = int(match.group(0))
-                        except ValueError:
+                    if date_str:
+                        game.release_date = date_str
+                        # Robust year parsing
+                        # Handles "Dec 17, 2025", "2025", "Q1 2025", etc.
+                        import re
+                        match = re.search(r'\b(19|20)\d{2}\b', date_str)
+                        if match:
+                            try:
+                                game.release_year = int(match.group(0))
+                            except ValueError:
+                                pass
+                        elif 'Coming Soon' in date_str or 'TBA' in date_str:
+                            # Use a special value if we know it's not released yet
+                            # This prevents re-fetching it every time
+                            # We can use 0 or leave it None if we want to keep trying
                             pass
                     
                     
