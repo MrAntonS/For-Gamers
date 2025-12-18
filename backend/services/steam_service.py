@@ -894,7 +894,8 @@ def verify_deal_on_steam(steam_id):
                     countdowns = soup.find_all('p', class_='game_purchase_discount_countdown')
                     import re
                     import calendar
-                    now = datetime.utcnow()
+                    # Use timezone-aware UTC
+                    now = datetime.now(timezone.utc)
                     earliest = None
                     for countdown in countdowns:
                         text = countdown.get_text(strip=True)
@@ -908,9 +909,10 @@ def verify_deal_on_steam(steam_id):
                             except ValueError:
                                 continue
                             try:
-                                deal_ends = datetime(year, month, day)
+                                # Create timezone-aware datetime
+                                deal_ends = datetime(year, month, day, tzinfo=timezone.utc)
                                 if deal_ends < now:
-                                    deal_ends = datetime(year + 1, month, day)
+                                    deal_ends = datetime(year + 1, month, day, tzinfo=timezone.utc)
                                 if earliest is None or deal_ends < earliest:
                                     earliest = deal_ends
                             except Exception:

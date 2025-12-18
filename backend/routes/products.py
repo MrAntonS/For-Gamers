@@ -357,6 +357,31 @@ def get_product(product_id):
                 if diff.total_seconds() > 86400: # 24 hours
                     should_verify = True
             
+            # EXTRA SAFETY: If game claims to be active but end date is in the past, FORCE verify
+            # This fixes the issue where buggy logic might have marked it active with a past date
+            if not should_verify and game.is_active and game.deal_ends_at:
+                end_date = game.deal_ends_at
+                # normalized comparison
+                if end_date.tzinfo is None:
+                     end_date = end_date.replace(tzinfo=timezone.utc)
+                else:
+                     end_date = end_date.astimezone(timezone.utc)
+                
+                if end_date < now_utc:
+                     should_verify = True
+                     print(f"Force verifying {game.title}: Active but expired end date")
+            
+            # CHECK EXPIRED DEALS: If user clicks on an expired deal, we should check it ONE TIME 
+            # to see if it's still expired or if a new sale started.
+            if not should_verify and not game.is_active:
+                 # If we haven't checked it in 24 hours, check it now
+                 if not last_ver:
+                      should_verify = True
+                 else:
+                      diff = now_utc - last_ver
+                      if diff.total_seconds() > 86400:
+                           should_verify = True
+            
             if should_verify and game.steam_id:
                 print(f"Verification needed for {game.title} (active: {game.is_active}, last verified: {game.deal_last_verified})")
                 
@@ -374,8 +399,8 @@ def get_product(product_id):
                         game.price = result['price']
                         game.original_price = result['original_price']
                         game.discount = result['discount']
-                        if result.get('deal_ends_at'):
-                            game.deal_ends_at = result['deal_ends_at']
+                        # ALWAYS update the end date. If verification returns None (unknown), we clear the old one.
+                        game.deal_ends_at = result.get('deal_ends_at')
                         game.is_active = True
                     else:
                         # Deal Expired or Still Expired
