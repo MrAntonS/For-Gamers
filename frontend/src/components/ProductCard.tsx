@@ -23,6 +23,8 @@ export interface ProductCardProps {
   isVerified?: boolean;
   groupCount?: number;
   isGrouped?: boolean;
+  steam_id?: number;
+  ebayItemId?: string;
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({
@@ -44,7 +46,9 @@ const ProductCard: React.FC<ProductCardProps> = ({
   fallbackImage = "https://placehold.co/400x600?text=No+Image",
   isVerified = false,
   groupCount = 0,
-  isGrouped = false
+  isGrouped = false,
+  steam_id,
+  ebayItemId
 }) => {
   const { addToCart } = useCart();
   const navigate = useNavigate();
@@ -58,7 +62,9 @@ const ProductCard: React.FC<ProductCardProps> = ({
         price,
         image,
         category,
-        originalPrice
+        originalPrice,
+        steam_id,
+        ebayItemId
       });
     }
   };

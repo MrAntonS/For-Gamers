@@ -5,6 +5,7 @@ import { API_BASE_URL } from '../config';
 
 interface GameDeal {
   id: number;
+  steam_id?: number;
   title: string;
   price: string;
   originalPrice?: string;
@@ -134,6 +135,7 @@ const GameDeals = () => {
         const data = await response.json();
         const mappedGames = data.products.map((p: any) => ({
           id: p.id,
+          steam_id: p.steam_id,
           title: p.title || p.name,
           price: p.price,
           originalPrice: p.originalPrice,
@@ -333,6 +335,7 @@ const GameDeals = () => {
                 <ProductCard
                   key={game.id}
                   id={game.id}
+                  steam_id={game.steam_id}
                   title={game.title}
                   price={game.price}
                   originalPrice={game.originalPrice}

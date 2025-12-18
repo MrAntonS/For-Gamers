@@ -5,6 +5,7 @@ import { API_BASE_URL } from '../config';
 
 interface HardwareDeal {
   id: number;
+  ebayItemId?: string;
   title: string;
   price: string;
   originalPrice?: string;
@@ -101,6 +102,7 @@ const HardwareDeals = () => {
         const data = await response.json();
         const mappedHardware = data.products.map((p: any) => ({
           id: p.id,
+          ebayItemId: p.ebayItemId,
           title: p.name,
           price: p.price,
           originalPrice: p.originalPrice,
@@ -291,6 +293,7 @@ const HardwareDeals = () => {
                 <ProductCard
                   key={item.id}
                   id={item.id}
+                  ebayItemId={item.ebayItemId}
                   title={item.title}
                   price={item.price}
                   originalPrice={item.originalPrice}
