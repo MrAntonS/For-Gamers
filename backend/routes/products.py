@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 import math
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from services.steam_service import (
     get_steam_featured,
     save_game_to_db,
@@ -118,7 +118,36 @@ def get_products():
             query = query.filter(Hardware.brand.in_(brands_list))
         
         hardware_list = query.all()
-        hardware_data = [h.to_dict() for h in hardware_list]
+        
+        # Group by search_term
+        grouped_hardware = {}
+        for h in hardware_list:
+            # key = search_term (preferred) or title (fallback)
+            key = h.search_term or h.title
+            if key not in grouped_hardware:
+                grouped_hardware[key] = []
+            grouped_hardware[key].append(h)
+        
+        # Select best deal for each group
+        for key, items in grouped_hardware.items():
+            # Calculate scores for all
+            scored_items = []
+            for item in items:
+                score = item.calculate_deal_score()
+                scored_items.append((score, item))
+            
+            # Sort by score desc
+            scored_items.sort(key=lambda x: x[0], reverse=True)
+            
+            # Pick the best one as representative
+            best_score, best_item = scored_items[0]
+            item_dict = best_item.to_dict()
+            
+            # Add metadata about the group
+            item_dict['groupCount'] = len(items)
+            item_dict['isGrouped'] = True
+            
+            hardware_data.append(item_dict)
 
     # --- Combine and Sort ---
     all_products = games_data + hardware_data
@@ -255,19 +284,123 @@ def get_product(product_id):
         # Search in Hardware database
         hardware = Hardware.query.get(product_id)
         if hardware:
-            return jsonify(hardware.to_dict())
+            response_dict = hardware.to_dict()
+            
+            # Fetch other deals for this search term (siblings)
+            if hardware.search_term:
+                siblings = Hardware.query.filter(
+                    Hardware.search_term == hardware.search_term,
+                    Hardware.id != hardware.id,
+                    Hardware.is_active == True
+                ).all()
+                
+                # Calculate scores and sort
+                deals_list = []
+                
+                # Add current item to the list too?
+                # User said: "list them sorted from best to worst". 
+                # Usually "Other Deals" excludes current, but "Available Deals" includes it.
+                # Let's include ALL relevant deals including the current one, so user can comparison shop easily.
+                
+                all_relevant = siblings + [hardware]
+                
+                for sib in all_relevant:
+                    sib_dict = sib.to_dict()
+                    sib_dict['dealScore'] = sib.calculate_deal_score() # Ensure fresh calc
+                    deals_list.append(sib_dict)
+                
+                # Sort best scoe first
+                deals_list.sort(key=lambda x: x['dealScore'], reverse=True)
+                
+                response_dict['listings'] = deals_list
+                response_dict['listings'] = deals_list
+            else:
+                # Avoid circular reference by creating a fresh copy or just not including self in a list that self owns?
+                # Actually, `response_dict['listings'] = [response_dict]` IS circular: Dict A -> List -> Dict A
+                # We need to make a COPY of the dict to put in the list, or structure the response differently.
+                # Since `response_dict` represents the "Main Product View", and `listings` are the "Deals", 
+                # it's better if `listings` contains *simplified* deal objects, or at least distinct copies.
+                
+                # Create a fresh dict for the listing entry
+                listing_entry = hardware.to_dict()
+                listing_entry['dealScore'] = hardware.calculate_deal_score()
+                response_dict['listings'] = [listing_entry]
+                
+            return jsonify(response_dict)
         return jsonify({"error": "Product not found"}), 404
         
     else:
         # Search in DB (Game)
         game = Game.query.get(product_id)
         if game:
+            # Check if we need to verify the deal (older than 24h)
+            should_verify = False
+            
+            # Verify regardless of active status (to catch expired deals coming back or confirm they are still expired)
+            if not game.deal_last_verified:
+                should_verify = True
+            else:
+                # Check if > 24 hours ago
+                # Ensure we compare timezone-aware datetimes
+                now_utc = datetime.now(timezone.utc)
+                
+                # deal_last_verified might be naive or aware depending on DB driver
+                # If naive, assume UTC. If aware, convert to UTC.
+                last_ver = game.deal_last_verified
+                if last_ver:
+                    if last_ver.tzinfo is None:
+                        last_ver = last_ver.replace(tzinfo=timezone.utc)
+                    else:
+                        last_ver = last_ver.astimezone(timezone.utc)
+                
+                diff = now_utc - last_ver
+                if diff.total_seconds() > 86400: # 24 hours
+                    should_verify = True
+            
+            if should_verify and game.steam_id:
+                print(f"Verification needed for {game.title} (active: {game.is_active}, last verified: {game.deal_last_verified})")
+                
+                # Run verification
+                result = verify_deal_on_steam(game.steam_id)
+                
+                if result:
+                    game.deal_last_verified = datetime.now(timezone.utc)
+                    
+                    if result['is_on_sale']:
+                        # Deal is Active or Reactivated
+                        if not game.is_active:
+                             print(f"Reactivating deal for {game.title}!")
+                             
+                        game.price = result['price']
+                        game.original_price = result['original_price']
+                        game.discount = result['discount']
+                        if result.get('deal_ends_at'):
+                            game.deal_ends_at = result['deal_ends_at']
+                        game.is_active = True
+                    else:
+                        # Deal Expired or Still Expired
+                        if game.is_active:
+                            print(f"Deal expired during verification: {game.title}")
+                            
+                        game.is_active = False
+                        game.price = game.original_price
+                        game.discount = 0
+                        game.deal_ends_at = None
+                    
+                    try:
+                        db.session.commit()
+                    except Exception as e:
+                        db.session.rollback()
+                        print(f"Error saving verification result: {e}")
+
             return jsonify(game.to_dict())
             
         # Fallback: Check hardware if not found in Games (in case category arg is wrong/missing)
         hardware = Hardware.query.get(product_id)
         if hardware:
-            return jsonify(hardware.to_dict())
+            # Reuse logic? For now, just recursive call or simple return
+            # Let's just return basic info here if category was wrong
+             return jsonify(hardware.to_dict())
             
         return jsonify({"error": "Product not found"}), 404
 

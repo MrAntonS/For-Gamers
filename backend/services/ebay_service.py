@@ -36,6 +36,12 @@ HARDWARE_CATEGORIES = {
     'Component': ['Gaming Laptop', 'Gaming PC', 'SSD', 'RAM DDR5', 'Gaming Chair']
 }
 
+# Generic keywords that shouldn't typically be used for product grouping
+GENERIC_KEYWORDS = {
+    'Gaming Mouse', 'Mechanical Keyboard', 'Gaming Headset', 'Gaming Monitor',
+    'Gaming Laptop', 'Gaming PC', 'SSD', 'RAM DDR5', 'Gaming Chair'
+}
+
 
 def get_oauth_token():
     """
@@ -146,13 +152,14 @@ def search_ebay_hardware(query, limit=50, category_filter=None):
         return None
 
 
-def parse_ebay_item(item_data, category_name=None):
+def parse_ebay_item(item_data, category_name=None, search_term=None):
     """
     Parse eBay item data into our Hardware model format.
     
     Args:
         item_data: Raw item data from eBay API
         category_name: Category to assign (GPU, Console, etc.)
+        search_term: The search query used to find this item
     
     Returns:
         Dictionary with parsed hardware data
@@ -236,8 +243,10 @@ def parse_ebay_item(item_data, category_name=None):
             'brand': brand,
             'seller_info': json.dumps(seller_info),
             'shipping_cost': shipping_cost,
+            'shipping_cost': shipping_cost,
             'is_active': True,
-            'deal_ends_at': None  # eBay doesn't always provide end dates in browse API
+            'deal_ends_at': None,  # eBay doesn't always provide end dates in browse API
+            'search_term': search_term
         }
         
     except Exception as e:
@@ -341,8 +350,12 @@ def fetch_all_hardware_deals(items_per_category=10):
             
             items = search_ebay_hardware(keyword, limit=items_per_category)
             if items:
+                # For generic keywords, don't use the keyword as a grouping search_term
+                # This ensures we don't group "Generic Mouse A" and "Generic Mouse B" together
+                term_to_save = keyword if keyword not in GENERIC_KEYWORDS else None
+                
                 for item in items:
-                    parsed = parse_ebay_item(item, category_name=category)
+                    parsed = parse_ebay_item(item, category_name=category, search_term=term_to_save)
                     if parsed and save_hardware_to_db(parsed):
                         total_fetched += 1
     

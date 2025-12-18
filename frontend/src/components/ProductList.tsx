@@ -13,6 +13,8 @@ interface Product {
   rating: number;
   brand?: string;
   description: string;
+  isGrouped?: boolean;
+  groupCount?: number;
 }
 
 interface Filters {
@@ -400,6 +402,8 @@ const ProductList = () => {
                   className="h-[350px]"
                   enableHoverReveal={true}
                   description={product.description}
+                  isGrouped={product.isGrouped}
+                  groupCount={product.groupCount}
                 />
               ))}
             </div>

@@ -21,17 +21,19 @@ export interface ProductCardProps {
   fallbackImage?: string;
   brand?: string;
   isVerified?: boolean;
+  groupCount?: number;
+  isGrouped?: boolean;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ 
+const ProductCard: React.FC<ProductCardProps> = ({
   id,
-  title, 
-  price, 
-  originalPrice, 
-  image, 
-  category, 
-  rating = 0, 
-  className = "", 
+  title,
+  price,
+  originalPrice,
+  image,
+  category,
+  rating = 0,
+  className = "",
   style,
   onClick,
   width,
@@ -40,7 +42,9 @@ const ProductCard: React.FC<ProductCardProps> = ({
   enableHoverReveal = true,
   showAddToCart = true,
   fallbackImage = "https://placehold.co/400x600?text=No+Image",
-  isVerified = false
+  isVerified = false,
+  groupCount = 0,
+  isGrouped = false
 }) => {
   const { addToCart } = useCart();
   const navigate = useNavigate();
@@ -66,7 +70,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
       navigate(`/product/${id}?category=${encodeURIComponent(category)}`);
     }
   };
-  
+
   const containerStyle = {
     ...style,
     width: width,
@@ -74,15 +78,15 @@ const ProductCard: React.FC<ProductCardProps> = ({
   };
 
   return (
-    <div 
+    <div
       className={`bg-gray-900 border border-gray-700 rounded-xl shadow-2xl transition-all duration-500 ease-out cursor-pointer hover:border-red-500 ${enableHoverReveal ? 'group relative hover:z-[100] hover:rounded-b-none overflow-visible' : 'overflow-hidden'} ${className}`}
       style={containerStyle}
       onClick={handleClick}
     >
       <div className={`h-3/5 w-full bg-gray-800 relative ${enableHoverReveal ? 'rounded-t-xl overflow-hidden' : ''}`}>
-        <img 
-          alt={title} 
-          className="w-full h-full object-cover" 
+        <img
+          alt={title}
+          className="w-full h-full object-cover"
           src={image}
           onError={(e) => {
             (e.target as HTMLImageElement).src = fallbackImage;
@@ -99,6 +103,11 @@ const ProductCard: React.FC<ProductCardProps> = ({
           <div className="bg-red-600 text-white text-[10px] 2xl:text-xs font-bold px-1.5 py-0.5 2xl:px-2 2xl:py-1 rounded">
             {category}
           </div>
+          {isGrouped && groupCount > 1 && (
+            <div className="bg-blue-600 text-white text-[10px] 2xl:text-xs font-bold px-1.5 py-0.5 2xl:px-2 2xl:py-1 rounded">
+              {groupCount} Deals
+            </div>
+          )}
         </div>
       </div>
       <div className="p-2 2xl:p-4 text-left flex flex-col h-[40%]">
@@ -112,10 +121,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
           </div>
           <div className="flex items-center">
             {[...Array(5)].map((_, i) => (
-              <svg 
-                key={i} 
-                className={`w-3 h-3 2xl:w-4 2xl:h-4 ${i < rating ? 'text-yellow-400' : 'text-gray-600'}`} 
-                fill="currentColor" 
+              <svg
+                key={i}
+                className={`w-3 h-3 2xl:w-4 2xl:h-4 ${i < rating ? 'text-yellow-400' : 'text-gray-600'}`}
+                fill="currentColor"
                 viewBox="0 0 20 20"
               >
                 <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
@@ -123,7 +132,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
             ))}
           </div>
         </div>
-        
+
         {description && (
           <div className="grow overflow-hidden mt-2 relative">
             <p className="text-gray-400 text-[10px] 2xl:text-xs line-clamp-3">{description}</p>
@@ -131,7 +140,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
         )}
 
         {showAddToCart && !enableHoverReveal && (
-          <button 
+          <button
             onClick={handleAddToCart}
             className="mt-2 2xl:mt-3 w-full bg-white text-black text-xs 2xl:text-sm font-bold py-1 2xl:py-2 rounded hover:bg-gray-200 transition-colors"
           >
@@ -152,10 +161,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
             </div>
             <div className="flex items-center">
               {[...Array(5)].map((_, i) => (
-                <svg 
-                  key={i} 
-                  className={`w-3 h-3 2xl:w-4 2xl:h-4 ${i < rating ? 'text-yellow-400' : 'text-gray-600'}`} 
-                  fill="currentColor" 
+                <svg
+                  key={i}
+                  className={`w-3 h-3 2xl:w-4 2xl:h-4 ${i < rating ? 'text-yellow-400' : 'text-gray-600'}`}
+                  fill="currentColor"
                   viewBox="0 0 20 20"
                 >
                   <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
@@ -169,9 +178,9 @@ const ProductCard: React.FC<ProductCardProps> = ({
               <p className="text-gray-400 text-[10px] 2xl:text-xs">{description}</p>
             </div>
           )}
-          
+
           {showAddToCart && (
-            <button 
+            <button
               onClick={handleAddToCart}
               className="mt-auto w-full bg-white text-black text-xs 2xl:text-sm font-bold py-1 2xl:py-2 rounded hover:bg-gray-200 transition-colors"
             >

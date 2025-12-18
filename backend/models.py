@@ -164,6 +164,7 @@ class Hardware(db.Model):
     shipping_cost = db.Column(db.Float, nullable=True)
     is_active = db.Column(db.Boolean, default=True)  # Whether the listing is still active
     deal_ends_at = db.Column(db.DateTime(timezone=True), nullable=True)  # Listing end time
+    search_term = db.Column(db.String(255), nullable=True)  # The query used to find this item (for grouping)
     last_updated = db.Column(db.DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     def calculate_deal_score(self):
@@ -203,8 +204,29 @@ class Hardware(db.Model):
         # Free shipping bonus
         shipping_bonus = 0.1 if (self.shipping_cost is None or self.shipping_cost == 0) else 0
         
+        # Seller Score Bonus (from 0 to 0.3)
+        seller_bonus = 0
+        if self.seller_info:
+            try:
+                import json
+                s_info = json.loads(self.seller_info)
+                feedback = float(s_info.get('feedbackPercentage', 0))
+                score = int(s_info.get('feedbackScore', 0))
+                
+                # Trust sellers with high feedback % and decent volume
+                if feedback >= 98.0 and score > 50:
+                    seller_bonus = 0.2
+                elif feedback >= 95.0 and score > 10:
+                    seller_bonus = 0.1
+                
+                # Extra boost for huge sellers
+                if score > 1000 and feedback >= 98.0:
+                    seller_bonus += 0.1
+            except:
+                pass
+
         # Combine scores
-        total_score = (discount_score + condition_bonus + savings_factor + shipping_bonus) * 100
+        total_score = (discount_score + condition_bonus + savings_factor + shipping_bonus + seller_bonus) * 100
         
         return round(total_score, 1)
 
@@ -237,6 +259,7 @@ class Hardware(db.Model):
             'category': 'Hardware',
             'categoryName': self.category_name,
             'brand': self.brand,
+            'searchTerm': self.search_term,
             'sellerInfo': seller_data,
             'shippingCost': f"${self.shipping_cost:.2f}" if self.shipping_cost is not None else "Free",
             'rating': None  # eBay items don't have ratings in the same way
