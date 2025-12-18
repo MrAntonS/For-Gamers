@@ -20,7 +20,9 @@ services:
       - POSTGRES_HOST=db
       - POSTGRES_DB=gamernexus
       - STEAM_API_KEY=${STEAM_API_KEY}
-      - EBAY_API_KEY=${EBAY_API_KEY}
+      - EBAY_CLIENT_ID=${EBAY_CLIENT_ID}
+      - EBAY_CLIENT_SECRET=${EBAY_CLIENT_SECRET}
+      - EBAY_API_ENV=${EBAY_API_ENV}
       - LOG_DIR=/app/logs
       - LOG_FILE=/app/logs/app.log
       - REDIRECT_STDOUT_TO_LOG=1
