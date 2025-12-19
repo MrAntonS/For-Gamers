@@ -12,6 +12,7 @@ from services.steam_service import (
 from services.ebay_service import verify_hardware_deal
 from models import Game, DealHistory, Hardware, db
 from sqlalchemy import or_
+import logging
 
 products_bp = Blueprint('products_bp', __name__)
 
@@ -423,6 +424,7 @@ def verify_product(product_id):
                 return jsonify(game.to_dict())
             except Exception as e:
                 db.session.rollback()
-                return jsonify({"error": str(e)}), 500
+                logging.exception("Error committing game verification changes for product_id=%s", product_id)
+                return jsonify({"error": "Internal server error"}), 500
         
         return jsonify({"error": "Verification failed"}), 500
