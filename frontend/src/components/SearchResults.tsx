@@ -15,6 +15,7 @@ interface Product {
   rating: number;
   brand?: string;
   description: string;
+  steam_id?: number;
 }
 
 interface FilterState {
@@ -112,7 +113,11 @@ const SearchResults = () => {
           throw new Error('Failed to fetch products');
         }
         const data = await response.json();
-        setProducts(data.products);
+        const mappedProducts = data.products.map((p: any) => ({
+          ...p,
+          title: p.title || p.name // Ensure title is set
+        }));
+        setProducts(mappedProducts);
         setTotalPages(data.total_pages);
         setTotalProducts(data.total_products);
       } catch (err) {
@@ -379,6 +384,7 @@ const SearchResults = () => {
                   rating={product.rating}
                   brand={product.brand}
                   description={product.description}
+                  steam_id={product.steam_id}
                   className="h-[350px]"
                   enableHoverReveal={true}
                 />

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
 import { API_BASE_URL } from '../config';
+import VariationSelector from './VariationSelector';
 
 interface Product {
   id: number;
@@ -28,6 +29,9 @@ interface Product {
   sellerInfo?: any;
   condition?: string;
   dealScore?: number;
+  isActive?: boolean;
+  itemGroupId?: string;
+  hasVariations?: boolean;
 }
 
 // Countdown timer component for deal end dates
@@ -100,6 +104,7 @@ const ProductPage: React.FC = () => {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
   const [imageError, setImageError] = useState(false);
 
   const category = searchParams.get('category') || 'Game';
@@ -119,14 +124,23 @@ const ProductPage: React.FC = () => {
         const data = await response.json();
         setProduct(data);
 
-        // Trigger background verification for games
-        if (category === 'Game') {
-          fetch(`${API_BASE_URL}/api/products/${id}/verify?category=${category}`, {
-            method: 'POST'
-          }).catch(() => {
-            // Silently ignore verification errors - it's not critical
+        // Trigger background verification
+        setIsVerifying(true);
+        fetch(`${API_BASE_URL}/api/products/${id}/verify?category=${category}`, {
+          method: 'POST'
+        })
+          .then(res => res.ok ? res.json() : Promise.reject())
+          .then(updatedData => {
+            if (updatedData) {
+              setProduct(prev => ({ ...prev, ...updatedData }));
+            }
+          })
+          .catch(() => {
+            console.warn('Background verification failed');
+          })
+          .finally(() => {
+            setIsVerifying(false);
           });
-        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load product');
       } finally {
@@ -321,15 +335,25 @@ const ProductPage: React.FC = () => {
                 </div>
               )}
 
-              <p className="text-gray-500 text-xs mb-4 flex items-center gap-1">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                {product.dealLastVerified
-                  ? `Deal verified: ${new Date(product.dealLastVerified).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
-                  : "This deal hasn't been verified yet"
-                }
-              </p>
+              <div className="text-gray-500 text-xs mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-1">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {isVerifying ? (
+                    <span className="text-blue-400 animate-pulse">Verifying deal status...</span>
+                  ) : product.isActive === false ? (
+                    <span className="text-red-500 font-bold">Deal no longer active</span>
+                  ) : product.dealLastVerified ? (
+                    `Deal verified: ${new Date(product.dealLastVerified).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+                  ) : (
+                    "This deal hasn't been verified yet"
+                  )}
+                </div>
+                {isVerifying && (
+                  <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                )}
+              </div>
 
               <button
                 onClick={handleAddToCart}
@@ -349,6 +373,26 @@ const ProductPage: React.FC = () => {
                 <p className="text-gray-400 leading-relaxed">
                   {product.description}
                 </p>
+              </div>
+            )}
+
+            {/* Variation Selector for Hardware with variations */}
+            {product.category === 'Hardware' && product.itemGroupId && product.id && (
+              <div className="mb-6">
+                <VariationSelector
+                  hardwareId={product.id}
+                  onVariationSelect={(variation) => {
+                    // Update product display with selected variation
+                    setProduct(prev => prev ? {
+                      ...prev,
+                      price: variation.price,
+                      originalPrice: variation.originalPrice,
+                      discount: variation.discount,
+                      condition: variation.condition,
+                      ebayItemId: variation.ebayItemId
+                    } : null);
+                  }}
+                />
               </div>
             )}
 

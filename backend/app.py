@@ -155,15 +155,16 @@ def create_app():
             app.logger.exception("Error running migrations")
 
         try:
-            from routes import products, minmax, auth, external
+            from routes import products, minmax, auth, external, variations
         except ImportError:
             # Fallback if running from a different context
-            from .routes import products, minmax, auth, external
+            from .routes import products, minmax, auth, external, variations
         
         app.register_blueprint(products.products_bp)
         app.register_blueprint(minmax.minmax_bp)
         app.register_blueprint(auth.auth_bp)
         app.register_blueprint(external.external_bp)
+        app.register_blueprint(variations.variations_bp)
 
     # Start background thread
     # IMPORTANT: In production with Gunicorn, we use a separate worker process (background_worker.py)

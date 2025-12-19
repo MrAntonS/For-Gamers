@@ -165,6 +165,10 @@ class Hardware(db.Model):
     is_active = db.Column(db.Boolean, default=True)  # Whether the listing is still active
     deal_ends_at = db.Column(db.DateTime(timezone=True), nullable=True)  # Listing end time
     search_term = db.Column(db.String(255), nullable=True)  # The query used to find this item (for grouping)
+    item_group_id = db.Column(db.String(100), nullable=True, index=True)  # eBay item group ID for variations
+    variation_specifics = db.Column(db.Text, nullable=True)  # JSON: {"Storage": "4TB", "RAM": "64GB"}
+    is_parent_listing = db.Column(db.Boolean, default=False)  # True if this is the main/representative item
+    deal_last_verified = db.Column(db.DateTime(timezone=True), nullable=True) # When we last verified deal is still active
     last_updated = db.Column(db.DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     def calculate_deal_score(self):
@@ -241,6 +245,19 @@ class Hardware(db.Model):
             except:
                 seller_data = None
         
+        # Calculate rating based on seller feedback percentage
+        rating = 0
+        if seller_data and seller_data.get('feedbackPercentage'):
+            try:
+                feedback = float(seller_data.get('feedbackPercentage', 0))
+                if feedback >= 99: rating = 5
+                elif feedback >= 97: rating = 4.5
+                elif feedback >= 95: rating = 4
+                elif feedback >= 90: rating = 3.5
+                elif feedback > 0: rating = 3
+            except:
+                rating = 0
+
         return {
             'id': self.id,
             'ebayItemId': self.ebay_item_id,
@@ -255,6 +272,7 @@ class Hardware(db.Model):
             'dealScore': self.calculate_deal_score(),
             'isActive': self.is_active,
             'lastUpdated': self.last_updated.isoformat() if self.last_updated else None,
+            'dealLastVerified': self.deal_last_verified.isoformat() if self.deal_last_verified else None,
             'dealEndsAt': self.deal_ends_at.isoformat() if self.deal_ends_at else None,
             'category': 'Hardware',
             'categoryName': self.category_name,
@@ -262,5 +280,8 @@ class Hardware(db.Model):
             'searchTerm': self.search_term,
             'sellerInfo': seller_data,
             'shippingCost': f"${self.shipping_cost:.2f}" if self.shipping_cost is not None else "Free",
-            'rating': None  # eBay items don't have ratings in the same way
+            'rating': rating,
+            'itemGroupId': self.item_group_id,
+            'variationSpecifics': json.loads(self.variation_specifics) if self.variation_specifics else None,
+            'isParentListing': self.is_parent_listing
         }
