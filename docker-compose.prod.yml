@@ -18,7 +18,7 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_HOST=db
-      - POSTGRES_DB=gamernexus
+      - POSTGRES_DB=gamernexus-prod
       - STEAM_API_KEY=${STEAM_API_KEY}
       - EBAY_CLIENT_ID=${EBAY_CLIENT_ID}
       - EBAY_CLIENT_SECRET=${EBAY_CLIENT_SECRET}
@@ -40,7 +40,7 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_HOST=db
-      - POSTGRES_DB=gamernexus
+      - POSTGRES_DB=gamernexus-prod
       - STEAM_API_KEY=${STEAM_API_KEY}
       - EBAY_CLIENT_ID=${EBAY_CLIENT_ID}
       - EBAY_CLIENT_SECRET=${EBAY_CLIENT_SECRET}
@@ -59,7 +59,7 @@ services:
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=gamernexus
+      - POSTGRES_DB=gamernexus-prod
     restart: always
 
 volumes:
