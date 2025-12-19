@@ -12,11 +12,11 @@ on:
         options:
           - dev
           - prod
-        default: prod
+        default: dev
       ref:
         description: Git ref (branch/tag/SHA) to deploy
         required: true
-        default: prod
+        default: dev
 
 jobs:
   deploy:
