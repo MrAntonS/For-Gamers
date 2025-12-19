@@ -385,10 +385,20 @@ def verify_product(product_id):
     """
     Verify a deal in the background (called by frontend on click/page load).
     Updates DB and returns the fresh product data.
+    Implements a 24-hour cooldown for verification.
     """
     category = request.args.get('category', 'Game')
+    cooldown_limit = datetime.now(timezone.utc) - timedelta(days=1)
     
     if category == 'Hardware':
+        hardware = Hardware.query.get(product_id)
+        if not hardware:
+            return jsonify({"error": "Hardware not found"}), 404
+            
+        # Check cooldown
+        if hardware.deal_last_verified and hardware.deal_last_verified > cooldown_limit:
+            return jsonify(hardware.to_dict())
+            
         hardware = verify_hardware_deal(product_id)
         if hardware:
             return jsonify(hardware.to_dict())
@@ -398,6 +408,10 @@ def verify_product(product_id):
         game = Game.query.get(product_id)
         if not game or not game.steam_id:
             return jsonify({"error": "Game not found"}), 404
+            
+        # Check cooldown
+        if game.deal_last_verified and game.deal_last_verified > cooldown_limit:
+            return jsonify(game.to_dict())
             
         print(f"Background verification for {game.title} (Steam ID: {game.steam_id})")
         
