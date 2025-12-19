@@ -120,6 +120,12 @@ def get_products():
     if fetch_hardware:
         query = Hardware.query.filter(Hardware.is_active == True)
         
+        # Only show parent listings (one representative per item group)
+        # Items without item_group_id are also included (standalone items)
+        query = query.filter(
+            (Hardware.is_parent_listing == True) | (Hardware.item_group_id == None)
+        )
+        
         # Search filter
         if search_query:
             query = query.filter(

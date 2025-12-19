@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
 import { API_BASE_URL } from '../config';
+import VariationSelector from './VariationSelector';
 
 interface Product {
   id: number;
@@ -28,6 +29,8 @@ interface Product {
   sellerInfo?: any;
   condition?: string;
   dealScore?: number;
+  itemGroupId?: string;
+  hasVariations?: boolean;
 }
 
 // Countdown timer component for deal end dates
@@ -101,6 +104,7 @@ const ProductPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
+  const [selectedVariation, setSelectedVariation] = useState<any>(null);
 
   const category = searchParams.get('category') || 'Game';
 
@@ -349,6 +353,27 @@ const ProductPage: React.FC = () => {
                 <p className="text-gray-400 leading-relaxed">
                   {product.description}
                 </p>
+              </div>
+            )}
+
+            {/* Variation Selector for Hardware with variations */}
+            {product.category === 'Hardware' && product.itemGroupId && product.id && (
+              <div className="mb-6">
+                <VariationSelector
+                  hardwareId={product.id}
+                  onVariationSelect={(variation) => {
+                    setSelectedVariation(variation);
+                    // Update product display with selected variation
+                    setProduct(prev => prev ? {
+                      ...prev,
+                      price: variation.price,
+                      originalPrice: variation.originalPrice,
+                      discount: variation.discount,
+                      condition: variation.condition,
+                      ebayItemId: variation.ebayItemId
+                    } : null);
+                  }}
+                />
               </div>
             )}
 

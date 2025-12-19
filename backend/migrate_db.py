@@ -49,6 +49,13 @@ def _migrate_sqlite(engine):
             cursor.execute("ALTER TABLE hardware ADD COLUMN search_term VARCHAR(255)")
         if 'seller_info' not in columns:
             cursor.execute("ALTER TABLE hardware ADD COLUMN seller_info TEXT")
+        if 'item_group_id' not in columns:
+            cursor.execute("ALTER TABLE hardware ADD COLUMN item_group_id VARCHAR(100)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_hardware_item_group_id ON hardware(item_group_id)")
+        if 'variation_specifics' not in columns:
+            cursor.execute("ALTER TABLE hardware ADD COLUMN variation_specifics TEXT")
+        if 'is_parent_listing' not in columns:
+            cursor.execute("ALTER TABLE hardware ADD COLUMN is_parent_listing BOOLEAN DEFAULT 0")
 
     if 'deal_history' not in tables:
         cursor.execute("""
@@ -101,6 +108,13 @@ def _migrate_postgres(engine):
                 conn.execute(text("ALTER TABLE hardware ADD COLUMN search_term VARCHAR(255)"))
             if 'seller_info' not in cols:
                 conn.execute(text("ALTER TABLE hardware ADD COLUMN seller_info TEXT"))
+            if 'item_group_id' not in cols:
+                conn.execute(text("ALTER TABLE hardware ADD COLUMN item_group_id VARCHAR(100)"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS idx_hardware_item_group_id ON hardware(item_group_id)"))
+            if 'variation_specifics' not in cols:
+                conn.execute(text("ALTER TABLE hardware ADD COLUMN variation_specifics TEXT"))
+            if 'is_parent_listing' not in cols:
+                conn.execute(text("ALTER TABLE hardware ADD COLUMN is_parent_listing BOOLEAN DEFAULT FALSE"))
 
         if 'deal_history' not in tables:
             # Use a straightforward CREATE TABLE; id as SERIAL primary key for Postgres

@@ -15,6 +15,8 @@ interface Product {
   description: string;
   isGrouped?: boolean;
   groupCount?: number;
+  itemGroupId?: string;
+  hasVariations?: boolean;
 }
 
 interface Filters {
@@ -404,6 +406,8 @@ const ProductList = () => {
                   description={product.description}
                   isGrouped={product.isGrouped}
                   groupCount={product.groupCount}
+                  itemGroupId={product.itemGroupId}
+                  hasVariations={product.hasVariations}
                 />
               ))}
             </div>

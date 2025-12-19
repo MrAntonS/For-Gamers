@@ -152,6 +152,54 @@ def search_ebay_hardware(query, limit=50, category_filter=None):
         return None
 
 
+def get_item_group_variations(item_group_id):
+    """
+    Fetch all variations for an item group using the getItemsByItemGroup API.
+    
+    Args:
+        item_group_id: The eBay item group ID
+    
+    Returns:
+        List of item dictionaries with variation details, or None if error
+    """
+    token = get_oauth_token()
+    if not token:
+        return None
+    
+    try:
+        headers = {
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json',
+            'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US'
+        }
+        
+        params = {
+            'item_group_id': item_group_id
+        }
+        
+        url = f"{BROWSE_API_URL}/item/get_items_by_item_group"
+        response = requests.get(url, headers=headers, params=params)
+        
+        if response.status_code == 200:
+            data = response.json()
+            items = data.get('items', [])
+            logger.info(f"Found {len(items)} variations for item group: {item_group_id}")
+            return items
+        elif response.status_code == 404:
+            logger.warning(f"Item group not found: {item_group_id}")
+            return None
+        elif response.status_code == 429:
+            logger.warning("eBay API rate limit exceeded")
+            return None
+        else:
+            logger.error(f"eBay API getItemsByItemGroup error: {response.status_code} - {response.text}")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Error fetching item group variations: {e}")
+        return None
+
+
 def parse_ebay_item(item_data, category_name=None, search_term=None):
     """
     Parse eBay item data into our Hardware model format.
@@ -229,6 +277,31 @@ def parse_ebay_item(item_data, category_name=None, search_term=None):
         # Short description from snippet
         description = item_data.get('shortDescription', title)
         
+        # Extract item group ID for variations
+        item_group_id = None
+        item_group_href = item_data.get('itemGroupHref')
+        if item_group_href:
+            # Extract ID from href like: "https://api.ebay.com/buy/browse/v1/item/get_items_by_item_group?item_group_id=123456"
+            try:
+                item_group_id = item_group_href.split('item_group_id=')[-1]
+            except:
+                pass
+        
+        # Extract variation specifics (e.g., {"Storage": "4TB", "RAM": "64GB"})
+        variation_specifics = None
+        localized_aspects = item_data.get('localizedAspects', [])
+        if localized_aspects:
+            specifics = {}
+            for aspect in localized_aspects:
+                name = aspect.get('name')
+                value = aspect.get('value')
+                if name and value:
+                    # Only include relevant variation attributes
+                    if name.lower() in ['storage', 'ram', 'memory', 'color', 'size', 'capacity', 'model']:
+                        specifics[name] = value
+            if specifics:
+                variation_specifics = json.dumps(specifics)
+        
         return {
             'ebay_item_id': item_id,
             'title': title,
@@ -243,10 +316,12 @@ def parse_ebay_item(item_data, category_name=None, search_term=None):
             'brand': brand,
             'seller_info': json.dumps(seller_info),
             'shipping_cost': shipping_cost,
-            'shipping_cost': shipping_cost,
             'is_active': True,
             'deal_ends_at': None,  # eBay doesn't always provide end dates in browse API
-            'search_term': search_term
+            'search_term': search_term,
+            'item_group_id': item_group_id,
+            'variation_specifics': variation_specifics,
+            'is_parent_listing': False  # Will be set later by grouping logic
         }
         
     except Exception as e:
@@ -288,6 +363,7 @@ def extract_brand_from_title(title):
 def save_hardware_to_db(hardware_data):
     """
     Save or update a hardware item in the database.
+    Also handles grouping logic for variations.
     
     Args:
         hardware_data: Dictionary with hardware fields
@@ -317,6 +393,12 @@ def save_hardware_to_db(hardware_data):
             logger.info(f"Added new hardware item: {new_hardware.title}")
         
         db.session.commit()
+        
+        # After saving, handle parent listing selection for item groups
+        item_group_id = hardware_data.get('item_group_id')
+        if item_group_id:
+            _update_parent_listing_for_group(item_group_id)
+        
         return True
         
     except IntegrityError as e:
@@ -327,6 +409,150 @@ def save_hardware_to_db(hardware_data):
         db.session.rollback()
         logger.error(f"Error saving hardware to database: {e}")
         return False
+
+
+def _update_parent_listing_for_group(item_group_id):
+    """
+    Update which variation is marked as the parent listing for an item group.
+    Selects the best deal based on price, condition, and seller rating.
+    
+    Args:
+        item_group_id: The eBay item group ID
+    """
+    try:
+        # Get all variations in this group
+        variations = Hardware.query.filter_by(
+            item_group_id=item_group_id,
+            is_active=True
+        ).all()
+        
+        if not variations or len(variations) <= 1:
+            # Single item or no items, mark as parent if exists
+            if variations:
+                variations[0].is_parent_listing = True
+                db.session.commit()
+            return
+        
+        # Score each variation
+        best_variation = None
+        best_score = -1
+        
+        for var in variations:
+            score = 0
+            
+            # Lower price is better (normalize to 0-100 scale)
+            if var.price:
+                # Inverse score: cheaper = higher score
+                max_price = max(v.price for v in variations if v.price)
+                min_price = min(v.price for v in variations if v.price)
+                if max_price > min_price:
+                    score += ((max_price - var.price) / (max_price - min_price)) * 40
+                else:
+                    score += 40
+            
+            # Condition bonus
+            if var.condition:
+                condition_lower = var.condition.lower()
+                if 'new' in condition_lower:
+                    score += 30
+                elif 'refurbished' in condition_lower or 'certified' in condition_lower:
+                    score += 20
+                elif 'excellent' in condition_lower or 'like new' in condition_lower:
+                    score += 15
+            
+            # Seller rating bonus
+            if var.seller_info:
+                try:
+                    seller_data = json.loads(var.seller_info)
+                    feedback_pct = float(seller_data.get('feedbackPercentage', 0))
+                    feedback_score = int(seller_data.get('feedbackScore', 0))
+                    
+                    if feedback_pct >= 98 and feedback_score > 100:
+                        score += 20
+                    elif feedback_pct >= 95 and feedback_score > 50:
+                        score += 10
+                except:
+                    pass
+            
+            # Free shipping bonus
+            if var.shipping_cost is None or var.shipping_cost == 0:
+                score += 10
+            
+            if score > best_score:
+                best_score = score
+                best_variation = var
+        
+        # Update parent listing flags
+        for var in variations:
+            var.is_parent_listing = (var.id == best_variation.id)
+        
+        db.session.commit()
+        logger.info(f"Set parent listing for group {item_group_id}: {best_variation.title}")
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error updating parent listing for group {item_group_id}: {e}")
+
+
+
+def enrich_item_group_with_variations(item_group_id):
+    """
+    Fetch variation details from eBay's getItemsByItemGroup API and update database.
+    This populates the variation_specifics field which isn't available in search results.
+    
+    Args:
+        item_group_id: The eBay item group ID
+    
+    Returns:
+        Number of variations updated
+    """
+    try:
+        # Fetch all variations for this item group from eBay
+        variations_data = get_item_group_variations(item_group_id)
+        
+        if not variations_data:
+            logger.warning(f"No variations found for item group {item_group_id}")
+            return 0
+        
+        updated_count = 0
+        
+        for var_data in variations_data:
+            item_id = var_data.get('itemId')
+            if not item_id:
+                continue
+            
+            # Find this item in our database
+            hardware = Hardware.query.filter_by(ebay_item_id=item_id).first()
+            if not hardware:
+                continue
+            
+            # Extract variation specifics from localizedAspects
+            localized_aspects = var_data.get('localizedAspects', [])
+            if localized_aspects:
+                specifics = {}
+                for aspect in localized_aspects:
+                    name = aspect.get('name')
+                    value = aspect.get('value')
+                    if name and value:
+                        # Only include relevant variation attributes
+                        if name.lower() in ['storage', 'ram', 'memory', 'color', 'size', 'capacity', 'model', 'processor', 'graphics']:
+                            specifics[name] = value
+                
+                if specifics:
+                    hardware.variation_specifics = json.dumps(specifics)
+                    updated_count += 1
+                    logger.info(f"Updated variation specifics for {item_id}: {specifics}")
+        
+        if updated_count > 0:
+            db.session.commit()
+            logger.info(f"Enriched {updated_count} variations for item group {item_group_id}")
+        
+        return updated_count
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error enriching item group {item_group_id}: {e}")
+        return 0
 
 
 def fetch_all_hardware_deals(items_per_category=10):
@@ -340,6 +566,7 @@ def fetch_all_hardware_deals(items_per_category=10):
         Total number of items fetched
     """
     total_fetched = 0
+    item_groups_to_enrich = set()  # Track unique item group IDs
     
     for category, keywords in HARDWARE_CATEGORIES.items():
         logger.info(f"Fetching {category} deals...")
@@ -358,6 +585,20 @@ def fetch_all_hardware_deals(items_per_category=10):
                     parsed = parse_ebay_item(item, category_name=category, search_term=term_to_save)
                     if parsed and save_hardware_to_db(parsed):
                         total_fetched += 1
+                        
+                        # Track item groups for enrichment
+                        if parsed.get('item_group_id'):
+                            item_groups_to_enrich.add(parsed['item_group_id'])
+    
+    # Enrich all item groups with variation specifics
+    if item_groups_to_enrich:
+        logger.info(f"Enriching {len(item_groups_to_enrich)} item groups with variation details...")
+        for item_group_id in item_groups_to_enrich:
+            try:
+                time.sleep(0.5)  # Rate limiting
+                enrich_item_group_with_variations(item_group_id)
+            except Exception as e:
+                logger.error(f"Error enriching item group {item_group_id}: {e}")
     
     logger.info(f"Finished fetching eBay hardware. Total items: {total_fetched}")
     return total_fetched
