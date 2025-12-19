@@ -24,6 +24,9 @@ def get_products():
     page = int(request.args.get('page', 1))
     limit = int(request.args.get('limit', 10))
     
+    # Search query parameter
+    search_query = request.args.get('search', '').strip()
+    
     category_arg = request.args.get('category')
     categories_filter = request.args.get('categories', '')
     categories_list = categories_filter.split(',') if categories_filter else []
@@ -79,6 +82,15 @@ def get_products():
     if fetch_games:
         query = Game.query.filter(Game.is_active == True)
         
+        # Search filter
+        if search_query:
+            query = query.filter(
+                or_(
+                    Game.title.ilike(f'%{search_query}%'),
+                    Game.description.ilike(f'%{search_query}%')
+                )
+            )
+        
         if min_price > 0:
             query = query.filter(Game.price >= min_price)
         if max_price < 10000:
@@ -107,6 +119,15 @@ def get_products():
     hardware_data = []
     if fetch_hardware:
         query = Hardware.query.filter(Hardware.is_active == True)
+        
+        # Search filter
+        if search_query:
+            query = query.filter(
+                or_(
+                    Hardware.title.ilike(f'%{search_query}%'),
+                    Hardware.description.ilike(f'%{search_query}%')
+                )
+            )
         
         if min_price > 0:
             query = query.filter(Hardware.price >= min_price)
@@ -159,6 +180,14 @@ def get_products():
             return float(str(val).replace('$', '').replace(',', ''))
         except:
             return 0
+    
+    # Calculate price range from filtered results (before pagination)
+    filtered_price_min = 0
+    filtered_price_max = 0
+    if all_products:
+        prices = [get_price_val(p) for p in all_products]
+        filtered_price_min = min(prices)
+        filtered_price_max = max(prices)
             
     if sort_option == 'price_asc':
         all_products.sort(key=get_price_val)
@@ -183,7 +212,9 @@ def get_products():
         "products": paginated_items,
         "total_pages": total_pages,
         "total": total_items,
-        "page": page
+        "page": page,
+        "price_min": filtered_price_min,
+        "price_max": filtered_price_max
     })
 
 @products_bp.route('/api/filters')

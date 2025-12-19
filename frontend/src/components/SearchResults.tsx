@@ -6,7 +6,7 @@ import { API_BASE_URL } from '../config';
 
 interface Product {
   id: number;
-  name: string;
+  title: string;
   price: string;
   originalPrice: string;
   image: string;
@@ -51,12 +51,12 @@ interface CheckboxFilterProps {
 const CheckboxFilter = ({ label, checked, onChange, disabled = false }: CheckboxFilterProps) => (
   <label className={`flex items-center space-x-3 cursor-pointer group ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
     <div className="relative flex items-center">
-      <input 
-        type="checkbox" 
+      <input
+        type="checkbox"
         checked={checked}
         onChange={(e) => !disabled && onChange(e.target.checked)}
         disabled={disabled}
-        className="peer h-4 w-4 cursor-pointer appearance-none rounded border border-gray-600 bg-gray-900 checked:border-red-600 checked:bg-red-600 transition-all disabled:cursor-not-allowed" 
+        className="peer h-4 w-4 cursor-pointer appearance-none rounded border border-gray-600 bg-gray-900 checked:border-red-600 checked:bg-red-600 transition-all disabled:cursor-not-allowed"
       />
       <svg className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 text-white opacity-0 peer-checked:opacity-100 pointer-events-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
         <polyline points="20 6 9 17 4 12"></polyline>
@@ -69,7 +69,7 @@ const CheckboxFilter = ({ label, checked, onChange, disabled = false }: Checkbox
 const SearchResults = () => {
   const [searchParams] = useSearchParams();
   const searchQuery = searchParams.get('q') || '';
-  
+
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -179,9 +179,9 @@ const SearchResults = () => {
         <div className={hasHardwareFilters ? 'opacity-50' : ''}>
           <FilterSection title="Genre (Games Only)">
             {genreOptions.map(genre => (
-              <CheckboxFilter 
+              <CheckboxFilter
                 key={genre}
-                label={genre} 
+                label={genre}
                 checked={isFilterChecked('genres', genre)}
                 onChange={() => toggleFilter('genres', genre)}
                 disabled={hasHardwareFilters}
@@ -191,7 +191,7 @@ const SearchResults = () => {
 
           <FilterSection title="Platform (Games Only)">
             {platformOptions.map(platform => (
-              <CheckboxFilter 
+              <CheckboxFilter
                 key={platform}
                 label={platform}
                 checked={isFilterChecked('platforms', platform)}
@@ -203,7 +203,7 @@ const SearchResults = () => {
 
           <FilterSection title="Release Year (Games Only)">
             {releaseYearOptions.map(year => (
-              <CheckboxFilter 
+              <CheckboxFilter
                 key={year}
                 label={year}
                 checked={isFilterChecked('releaseYears', year)}
@@ -218,7 +218,7 @@ const SearchResults = () => {
         <div className={hasGameFilters ? 'opacity-50' : ''}>
           <FilterSection title="Component Type (Hardware Only)">
             {componentTypeOptions.map(type => (
-              <CheckboxFilter 
+              <CheckboxFilter
                 key={type}
                 label={type}
                 checked={isFilterChecked('componentTypes', type)}
@@ -230,7 +230,7 @@ const SearchResults = () => {
 
           <FilterSection title="Peripherals (Hardware Only)">
             {peripheralOptions.map(peripheral => (
-              <CheckboxFilter 
+              <CheckboxFilter
                 key={peripheral}
                 label={peripheral}
                 checked={isFilterChecked('peripherals', peripheral)}
@@ -242,7 +242,7 @@ const SearchResults = () => {
 
           <FilterSection title="Brand (Hardware Only)">
             {brandOptions.map(brand => (
-              <CheckboxFilter 
+              <CheckboxFilter
                 key={brand}
                 label={brand}
                 checked={isFilterChecked('brands', brand)}
@@ -254,7 +254,7 @@ const SearchResults = () => {
 
           <FilterSection title="Condition (Hardware Only)">
             {conditionOptions.map(condition => (
-              <CheckboxFilter 
+              <CheckboxFilter
                 key={condition}
                 label={condition}
                 checked={isFilterChecked('conditions', condition)}
@@ -268,11 +268,11 @@ const SearchResults = () => {
         {/* Common Filters */}
         <FilterSection title="Price Range">
           <div className="px-1">
-            <input 
-              type="range" 
-              min="0" 
-              max="2000" 
-              value={filters.priceRange} 
+            <input
+              type="range"
+              min="0"
+              max="2000"
+              value={filters.priceRange}
               onChange={(e) => setFilters(prev => ({ ...prev, priceRange: Number(e.target.value) }))}
               className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-red-600"
             />
@@ -287,11 +287,11 @@ const SearchResults = () => {
           {[5, 4, 3, 2, 1].map((stars) => (
             <label key={stars} className="flex items-center space-x-3 cursor-pointer group">
               <div className="relative flex items-center">
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
                   checked={filters.ratings.includes(stars)}
                   onChange={() => toggleFilter('ratings', stars)}
-                  className="peer h-4 w-4 cursor-pointer appearance-none rounded border border-gray-600 bg-gray-900 checked:border-red-600 checked:bg-red-600 transition-all" 
+                  className="peer h-4 w-4 cursor-pointer appearance-none rounded border border-gray-600 bg-gray-900 checked:border-red-600 checked:bg-red-600 transition-all"
                 />
                 <svg className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 text-white opacity-0 peer-checked:opacity-100 pointer-events-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="20 6 9 17 4 12"></polyline>
@@ -299,10 +299,10 @@ const SearchResults = () => {
               </div>
               <div className="flex items-center">
                 {[...Array(5)].map((_, i) => (
-                  <svg 
-                    key={i} 
-                    className={`w-3 h-3 ${i < stars ? 'text-yellow-400' : 'text-gray-700'}`} 
-                    fill="currentColor" 
+                  <svg
+                    key={i}
+                    className={`w-3 h-3 ${i < stars ? 'text-yellow-400' : 'text-gray-700'}`}
+                    fill="currentColor"
                     viewBox="0 0 20 20"
                   >
                     <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
@@ -354,7 +354,7 @@ const SearchResults = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="flex-1 overflow-y-auto p-4 pt-0 min-h-0 custom-scrollbar">
           {loading ? (
             <div className="text-center py-10 text-white">Searching...</div>
@@ -371,7 +371,7 @@ const SearchResults = () => {
                 <ProductCard
                   key={product.id}
                   id={product.id}
-                  title={product.name}
+                  title={product.title}
                   price={product.price}
                   originalPrice={product.originalPrice}
                   image={product.image}
@@ -389,10 +389,10 @@ const SearchResults = () => {
 
         {/* Pagination */}
         {products.length > 0 && (
-          <Pagination 
-            currentPage={currentPage} 
-            totalPages={totalPages} 
-            onPageChange={setCurrentPage} 
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
           />
         )}
       </main>

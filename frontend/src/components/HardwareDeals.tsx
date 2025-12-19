@@ -59,6 +59,13 @@ const HardwareDeals = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  // Dynamic price range from backend
+  const [priceRange, setPriceRange] = useState({ min: 0, max: 2000 });
+
+  // Manual price input modal state
+  const [showPriceModal, setShowPriceModal] = useState<'min' | 'max' | null>(null);
+  const [tempPriceInput, setTempPriceInput] = useState('');
+
   // Filter state
   const [filters, setFilters] = useState<Filters>({
     minPrice: 0,
@@ -81,6 +88,7 @@ const HardwareDeals = () => {
     const fetchHardware = async () => {
       setLoading(true);
       try {
+        // Fetch with price filters for products
         const queryParams = new URLSearchParams({
           category: 'Hardware',
           page: currentPage.toString(),
@@ -123,9 +131,79 @@ const HardwareDeals = () => {
     fetchHardware();
   }, [currentPage, appliedFilters]);
 
+  // Separate effect to fetch price range (without price filters)
+  useEffect(() => {
+    const fetchPriceRange = async () => {
+      try {
+        // Fetch WITHOUT price filters to get the full range
+        const queryParams = new URLSearchParams({
+          category: 'Hardware',
+          page: '1',
+          limit: '1',
+          min_price: '0',
+          max_price: '999999',
+          rating: appliedFilters.rating.toString(),
+          sort: appliedFilters.sort,
+          component_types: appliedFilters.componentTypes.join(','),
+          peripherals: appliedFilters.peripherals.join(','),
+          brands: appliedFilters.brands.join(','),
+          conditions: appliedFilters.conditions.join(',')
+        });
+
+        const response = await fetch(`${API_BASE_URL}/api/products?${queryParams.toString()}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.price_min !== undefined && data.price_max !== undefined) {
+            setPriceRange({ min: data.price_min, max: data.price_max });
+
+            // On first load, also update the filter values to match the range
+            setFilters(prev => ({
+              ...prev,
+              minPrice: data.price_min,
+              maxPrice: data.price_max
+            }));
+            setAppliedFilters(prev => ({
+              ...prev,
+              minPrice: data.price_min,
+              maxPrice: data.price_max
+            }));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch price range:', err);
+      }
+    };
+
+    fetchPriceRange();
+  }, [
+    appliedFilters.componentTypes,
+    appliedFilters.peripherals,
+    appliedFilters.brands,
+    appliedFilters.conditions,
+    appliedFilters.rating,
+    appliedFilters.sort
+  ]); // Only update when non-price filters change
+
   const handleApplyFilters = () => {
     setAppliedFilters(filters);
     setCurrentPage(1);
+  };
+
+  const handlePriceModalOpen = (type: 'min' | 'max') => {
+    setShowPriceModal(type);
+    setTempPriceInput(type === 'min' ? filters.minPrice.toString() : filters.maxPrice.toString());
+  };
+
+  const handlePriceModalSubmit = () => {
+    const value = parseFloat(tempPriceInput);
+    if (!isNaN(value) && value >= 0) {
+      if (showPriceModal === 'min') {
+        setFilters(prev => ({ ...prev, minPrice: Math.min(value, prev.maxPrice) }));
+      } else if (showPriceModal === 'max') {
+        setFilters(prev => ({ ...prev, maxPrice: Math.max(value, prev.minPrice) }));
+      }
+    }
+    setShowPriceModal(null);
   };
 
   return (
@@ -193,17 +271,86 @@ const HardwareDeals = () => {
 
         <FilterSection title="Price Range">
           <div className="px-1">
-            <input
-              type="range"
-              min="0"
-              max="2000"
-              value={filters.maxPrice}
-              onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: Number(e.target.value) }))}
-              className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-red-600"
-            />
-            <div className="flex justify-between mt-2 text-xs text-gray-400">
-              <span>$0</span>
-              <span>${filters.maxPrice}</span>
+            {/* Dual-point range slider visualization */}
+            <div className="relative h-1 bg-gray-700 rounded-lg mb-8">
+              {/* Selected range highlight */}
+              <div
+                className="absolute h-full bg-red-600 rounded-lg"
+                style={{
+                  left: `${((filters.minPrice - priceRange.min) / (priceRange.max - priceRange.min)) * 100}%`,
+                  right: `${100 - ((filters.maxPrice - priceRange.min) / (priceRange.max - priceRange.min)) * 100}%`
+                }}
+              />
+
+              {/* Min slider */}
+              <input
+                type="range"
+                min={priceRange.min}
+                max={priceRange.max}
+                value={filters.minPrice}
+                onChange={(e) => setFilters(prev => ({ ...prev, minPrice: Math.min(Number(e.target.value), prev.maxPrice) }))}
+                className="absolute w-full h-1 appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-red-600 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-red-600 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white"
+              />
+
+              {/* Max slider */}
+              <input
+                type="range"
+                min={priceRange.min}
+                max={priceRange.max}
+                value={filters.maxPrice}
+                onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: Math.max(Number(e.target.value), prev.minPrice) }))}
+                className="absolute w-full h-1 appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-red-600 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-red-600 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white"
+              />
+            </div>
+
+            <div className="flex justify-between items-center text-xs space-x-2">
+              {/* Min price - inline input */}
+              {showPriceModal === 'min' ? (
+                <input
+                  type="number"
+                  value={tempPriceInput}
+                  onChange={(e) => setTempPriceInput(e.target.value)}
+                  onBlur={handlePriceModalSubmit}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handlePriceModalSubmit();
+                    if (e.key === 'Escape') setShowPriceModal(null);
+                  }}
+                  className="w-20 bg-gray-800 border border-red-600 text-white rounded px-2 py-1 focus:outline-none"
+                  autoFocus
+                />
+              ) : (
+                <span
+                  className="text-gray-400 hover:text-red-500 cursor-pointer transition-colors"
+                  onClick={() => handlePriceModalOpen('min')}
+                  title="Click to edit"
+                >
+                  ${filters.minPrice}
+                </span>
+              )}
+
+              {/* Max price - inline input */}
+              {showPriceModal === 'max' ? (
+                <input
+                  type="number"
+                  value={tempPriceInput}
+                  onChange={(e) => setTempPriceInput(e.target.value)}
+                  onBlur={handlePriceModalSubmit}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handlePriceModalSubmit();
+                    if (e.key === 'Escape') setShowPriceModal(null);
+                  }}
+                  className="w-20 bg-gray-800 border border-red-600 text-white rounded px-2 py-1 focus:outline-none text-right"
+                  autoFocus
+                />
+              ) : (
+                <span
+                  className="text-gray-400 hover:text-red-500 cursor-pointer transition-colors"
+                  onClick={() => handlePriceModalOpen('max')}
+                  title="Click to edit"
+                >
+                  ${filters.maxPrice}
+                </span>
+              )}
             </div>
           </div>
         </FilterSection>
