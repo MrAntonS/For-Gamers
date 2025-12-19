@@ -10,6 +10,7 @@ export interface DealItem {
   category: string;
   rating?: number;
   description?: string;
+  steam_id?: number;
 }
 
 interface ArcCarouselProps {
@@ -21,8 +22,8 @@ interface ArcCarouselProps {
 const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage }) => {
   const [scrollProgress, setScrollProgress] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
-  const [dimensions, setDimensions] = useState({ 
-    radiusX: 250, 
+  const [dimensions, setDimensions] = useState({
+    radiusX: 250,
     radiusY: 500,
     cardWidth: 240,
     cardHeight: 350
@@ -33,8 +34,8 @@ const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage })
   const lastScrollTime = useRef<number>(0);
 
   // Configuration
-  const VISIBLE_ITEMS = 6; 
-  
+  const VISIBLE_ITEMS = 6;
+
   const totalItems = items.length;
 
   // Responsive dimensions
@@ -43,8 +44,8 @@ const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage })
       const h = window.innerHeight;
       // Scale down for smaller screens
       // Base height reference: 900px
-      const scaleFactor = Math.min(1, Math.max(0.6, h / 900)); 
-      
+      const scaleFactor = Math.min(1, Math.max(0.6, h / 900));
+
       setDimensions({
         radiusX: 250 * scaleFactor,
         radiusY: h * 0.4, // Dynamic Y radius based on viewport height
@@ -52,28 +53,28 @@ const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage })
         cardHeight: 350 * scaleFactor
       });
     };
-    
+
     window.addEventListener('resize', handleResize);
     handleResize();
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-  
+
   // Auto-scroll
   useEffect(() => {
     if (totalItems === 0 || isHovered) return;
-    
+
     const animate = (time: number) => {
       if (time - lastScrollTime.current > 16) { // Cap at ~60fps
         setScrollProgress(prev => {
-            const next = prev + 0.002; // Slow auto-scroll
-            return next % totalItems;
+          const next = prev + 0.002; // Slow auto-scroll
+          return next % totalItems;
         });
         lastScrollTime.current = time;
       }
       autoScrollRef.current = requestAnimationFrame(animate);
     };
     autoScrollRef.current = requestAnimationFrame(animate);
-    
+
     return () => {
       if (autoScrollRef.current) cancelAnimationFrame(autoScrollRef.current);
     };
@@ -82,7 +83,7 @@ const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage })
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.stopPropagation();
     // e.preventDefault(); // React synthetic events can't always prevent default passive listeners
-    
+
     const delta = e.deltaY * 0.001; // Sensitivity
     setScrollProgress(prev => {
       let next = prev + delta;
@@ -106,11 +107,11 @@ const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage })
     if (totalItems === 0) return { display: 'none' };
 
     let offset = index - scrollProgress;
-    
+
     // Shortest path wrapping
     while (offset < -totalItems / 2) offset += totalItems;
     while (offset > totalItems / 2) offset -= totalItems;
-    
+
     // Visibility check
     if (Math.abs(offset) > VISIBLE_ITEMS / 2 + 1) {
       return { display: 'none' };
@@ -119,28 +120,28 @@ const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage })
     // Map offset to angle. 
     // We want the visible items to span a certain angle range.
     // Let's say we want to span 120 degrees (PI * 2/3).
-    const angleSpread = Math.PI * 0.6; 
+    const angleSpread = Math.PI * 0.6;
     const angle = offset * (angleSpread / (VISIBLE_ITEMS / 2));
-    
+
     // Calculate position
     const y = Math.sin(angle) * dimensions.radiusY;
     const xOffset = Math.cos(angle) * dimensions.radiusX;
-    
+
     let x, rotate;
-    
+
     if (side === 'left') {
-        // Arc bows right )
-        // Center is to the left.
-        // At angle 0 (center), x should be max (closest to screen center).
-        // x = -RADIUS_X + xOffset.
-        // We want to shift it so it's visible.
-        x = -dimensions.radiusX + xOffset + 20; 
-        rotate = angle * (180 / Math.PI) * 0.3;
+      // Arc bows right )
+      // Center is to the left.
+      // At angle 0 (center), x should be max (closest to screen center).
+      // x = -RADIUS_X + xOffset.
+      // We want to shift it so it's visible.
+      x = -dimensions.radiusX + xOffset + 20;
+      rotate = angle * (180 / Math.PI) * 0.3;
     } else {
-        // Arc bows left (
-        // Center is to the right.
-        x = dimensions.radiusX - xOffset - 20;
-        rotate = -angle * (180 / Math.PI) * 0.3;
+      // Arc bows left (
+      // Center is to the right.
+      x = dimensions.radiusX - xOffset - 20;
+      rotate = -angle * (180 / Math.PI) * 0.3;
     }
 
     const scale = Math.max(0.6, Math.cos(angle));
@@ -162,7 +163,7 @@ const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage })
   };
 
   return (
-    <div 
+    <div
       ref={containerRef}
       onWheel={handleWheel}
       onMouseEnter={() => setIsHovered(true)}
@@ -172,14 +173,14 @@ const ArcCarousel: React.FC<ArcCarouselProps> = ({ items, side, fallbackImage })
       <div className="relative w-full h-full">
         {items.map((item, index) => (
           <div key={item.id} style={getItemStyle(index)} className="will-change-transform">
-             <ProductCard
-                {...item}
-                width={`${dimensions.cardWidth}px`}
-                height={`${dimensions.cardHeight}px`}
-                className="shadow-2xl"
-                enableHoverReveal={true}
-                fallbackImage={fallbackImage}
-             />
+            <ProductCard
+              {...item}
+              width={`${dimensions.cardWidth}px`}
+              height={`${dimensions.cardHeight}px`}
+              className="shadow-2xl"
+              enableHoverReveal={true}
+              fallbackImage={fallbackImage}
+            />
           </div>
         ))}
       </div>

@@ -39,12 +39,18 @@ const Checkout: React.FC = () => {
     // Steam doesn't have a direct "add multiple to cart" API, so we'll create a list
     const generateSteamLinks = () => {
         return gameItems.map(item => {
-            // Use steam_id if available, otherwise fall back to id
-            const steamId = item.steam_id || item.id;
+            // Use steam_id if available. 
+            // If missing, fall back to searching for the game name on Steam
+            // instead of using our database 'id' which causes a redirect to the home page.
+            const url = item.steam_id
+                ? `https://store.steampowered.com/app/${item.steam_id}`
+                : `https://store.steampowered.com/search/?term=${encodeURIComponent(item.name)}`;
+
             return {
                 name: item.name,
-                url: `https://store.steampowered.com/app/${steamId}`,
-                quantity: item.quantity
+                url,
+                quantity: item.quantity,
+                missingId: !item.steam_id
             };
         });
     };

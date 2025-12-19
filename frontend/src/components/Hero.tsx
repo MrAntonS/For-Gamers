@@ -14,7 +14,7 @@ const Hero = () => {
         const gamesResponse = await fetch(`${API_BASE_URL}/api/products?category=Game&limit=20`);
         // Fetch hardware (uses mock data for now)
         const hardwareResponse = await fetch(`${API_BASE_URL}/api/products?category=Hardware&limit=20`);
-        
+
         if (gamesResponse.ok) {
           const gamesData = await gamesResponse.json();
           const games = gamesData.products.map((p: any) => ({
@@ -25,7 +25,9 @@ const Hero = () => {
             image: p.image,
             category: p.category,
             rating: p.rating,
-            description: p.description
+            description: p.description,
+            steam_id: p.steam_id,
+            ebayItemId: p.ebayItemId
           }));
           setGameDeals(games);
         }
@@ -40,7 +42,9 @@ const Hero = () => {
             image: p.image,
             category: p.category,
             rating: p.rating,
-            description: p.description
+            description: p.description,
+            steam_id: p.steam_id,
+            ebayItemId: p.ebayItemId
           }));
           setHardwareDeals(hardware);
         }

@@ -17,6 +17,7 @@ interface Product {
   groupCount?: number;
   itemGroupId?: string;
   hasVariations?: boolean;
+  steam_id?: number;
 }
 
 interface Filters {
@@ -408,6 +409,7 @@ const ProductList = () => {
                   groupCount={product.groupCount}
                   itemGroupId={product.itemGroupId}
                   hasVariations={product.hasVariations}
+                  steam_id={product.steam_id}
                 />
               ))}
             </div>
