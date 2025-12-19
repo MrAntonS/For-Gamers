@@ -106,7 +106,6 @@ const ProductPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const [selectedVariation, setSelectedVariation] = useState<any>(null);
 
   const category = searchParams.get('category') || 'Game';
 
@@ -383,7 +382,6 @@ const ProductPage: React.FC = () => {
                 <VariationSelector
                   hardwareId={product.id}
                   onVariationSelect={(variation) => {
-                    setSelectedVariation(variation);
                     // Update product display with selected variation
                     setProduct(prev => prev ? {
                       ...prev,
