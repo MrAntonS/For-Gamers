@@ -18,8 +18,7 @@ interface HardwareDeal {
 interface Filters {
   minPrice: number;
   maxPrice: number;
-  componentTypes: string[];
-  peripherals: string[];
+  categories: string[];
   brands: string[];
   conditions: string[];
   rating: number;
@@ -59,6 +58,17 @@ const HardwareDeals = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  // Dynamic filter options from backend
+  const [filterOptions, setFilterOptions] = useState<{
+    categories: string[];
+    brands: string[];
+    conditions: string[];
+  }>({
+    categories: [],
+    brands: [],
+    conditions: []
+  });
+
   // Dynamic price range from backend
   const [priceRange, setPriceRange] = useState({ min: 0, max: 2000 });
 
@@ -70,8 +80,7 @@ const HardwareDeals = () => {
   const [filters, setFilters] = useState<Filters>({
     minPrice: 0,
     maxPrice: 2000,
-    componentTypes: [],
-    peripherals: [],
+    categories: [],
     brands: [],
     conditions: [],
     rating: 0,
@@ -83,6 +92,43 @@ const HardwareDeals = () => {
 
   // Check if filters have changed
   const hasFilterChanges = JSON.stringify(filters) !== JSON.stringify(appliedFilters);
+
+  // Fetch filter options and initial price range
+  useEffect(() => {
+    const fetchOptions = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/filters`);
+        if (response.ok) {
+          const data = await response.json();
+          // Filter out meta-categories for the hardware page
+          const hardwareCats = data.categories.filter((c: string) => c !== 'Game' && c !== 'Hardware');
+
+          setFilterOptions({
+            categories: hardwareCats,
+            brands: data.brands.filter((b: string) => b !== 'Steam'),
+            conditions: data.conditions
+          });
+
+          if (data.price_min !== undefined && data.price_max !== undefined) {
+            setPriceRange({ min: data.price_min, max: data.price_max });
+            setFilters(prev => ({
+              ...prev,
+              minPrice: data.price_min,
+              maxPrice: data.price_max
+            }));
+            setAppliedFilters(prev => ({
+              ...prev,
+              minPrice: data.price_min,
+              maxPrice: data.price_max
+            }));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch filter options:', err);
+      }
+    };
+    fetchOptions();
+  }, []);
 
   useEffect(() => {
     const fetchHardware = async () => {
@@ -97,8 +143,7 @@ const HardwareDeals = () => {
           max_price: appliedFilters.maxPrice.toString(),
           rating: appliedFilters.rating.toString(),
           sort: appliedFilters.sort,
-          component_types: appliedFilters.componentTypes.join(','),
-          peripherals: appliedFilters.peripherals.join(','),
+          categories: appliedFilters.categories.join(','),
           brands: appliedFilters.brands.join(','),
           conditions: appliedFilters.conditions.join(',')
         });
@@ -111,7 +156,7 @@ const HardwareDeals = () => {
         const mappedHardware = data.products.map((p: any) => ({
           id: p.id,
           ebayItemId: p.ebayItemId,
-          title: p.name,
+          title: p.title,
           price: p.price,
           originalPrice: p.originalPrice,
           category: p.category,
@@ -130,59 +175,6 @@ const HardwareDeals = () => {
 
     fetchHardware();
   }, [currentPage, appliedFilters]);
-
-  // Separate effect to fetch price range (without price filters)
-  useEffect(() => {
-    const fetchPriceRange = async () => {
-      try {
-        // Fetch WITHOUT price filters to get the full range
-        const queryParams = new URLSearchParams({
-          category: 'Hardware',
-          page: '1',
-          limit: '1',
-          min_price: '0',
-          max_price: '999999',
-          rating: appliedFilters.rating.toString(),
-          sort: appliedFilters.sort,
-          component_types: appliedFilters.componentTypes.join(','),
-          peripherals: appliedFilters.peripherals.join(','),
-          brands: appliedFilters.brands.join(','),
-          conditions: appliedFilters.conditions.join(',')
-        });
-
-        const response = await fetch(`${API_BASE_URL}/api/products?${queryParams.toString()}`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.price_min !== undefined && data.price_max !== undefined) {
-            setPriceRange({ min: data.price_min, max: data.price_max });
-
-            // On first load, also update the filter values to match the range
-            setFilters(prev => ({
-              ...prev,
-              minPrice: data.price_min,
-              maxPrice: data.price_max
-            }));
-            setAppliedFilters(prev => ({
-              ...prev,
-              minPrice: data.price_min,
-              maxPrice: data.price_max
-            }));
-          }
-        }
-      } catch (err) {
-        console.error('Failed to fetch price range:', err);
-      }
-    };
-
-    fetchPriceRange();
-  }, [
-    appliedFilters.componentTypes,
-    appliedFilters.peripherals,
-    appliedFilters.brands,
-    appliedFilters.conditions,
-    appliedFilters.rating,
-    appliedFilters.sort
-  ]); // Only update when non-price filters change
 
   const handleApplyFilters = () => {
     setAppliedFilters(filters);
@@ -227,47 +219,37 @@ const HardwareDeals = () => {
           </button>
         </div>
 
-        <FilterSection title="Component Type">
-          {['GPU (Graphics Card)', 'CPU (Processor)', 'Motherboard', 'RAM (Memory)', 'Storage (SSD/HDD)', 'Power Supply', 'Cooling', 'Case'].map(type => (
-            <CheckboxFilter
-              key={type}
-              label={type}
-              checked={filters.componentTypes.includes(type)}
-              onChange={(checked) => setFilters(prev => ({
-                ...prev,
-                componentTypes: checked ? [...prev.componentTypes, type] : prev.componentTypes.filter(t => t !== type)
-              }))}
-            />
-          ))}
-        </FilterSection>
+        {filterOptions.categories.length > 0 && (
+          <FilterSection title="Category">
+            {filterOptions.categories.map(cat => (
+              <CheckboxFilter
+                key={cat}
+                label={cat}
+                checked={filters.categories.includes(cat)}
+                onChange={(checked) => setFilters(prev => ({
+                  ...prev,
+                  categories: checked ? [...prev.categories, cat] : prev.categories.filter((t: string) => t !== cat)
+                }))}
+              />
+            ))}
+          </FilterSection>
+        )}
 
-        <FilterSection title="Peripherals">
-          {['Mouse', 'Keyboard', 'Headset', 'Monitor', 'Webcam', 'Microphone', 'Controller'].map(peri => (
-            <CheckboxFilter
-              key={peri}
-              label={peri}
-              checked={filters.peripherals.includes(peri)}
-              onChange={(checked) => setFilters(prev => ({
-                ...prev,
-                peripherals: checked ? [...prev.peripherals, peri] : prev.peripherals.filter(p => p !== peri)
-              }))}
-            />
-          ))}
-        </FilterSection>
-
-        <FilterSection title="Brand">
-          {['NVIDIA', 'AMD', 'Intel', 'Corsair', 'Logitech', 'Razer', 'Samsung', 'ASUS'].map(brand => (
-            <CheckboxFilter
-              key={brand}
-              label={brand}
-              checked={filters.brands.includes(brand)}
-              onChange={(checked) => setFilters(prev => ({
-                ...prev,
-                brands: checked ? [...prev.brands, brand] : prev.brands.filter(b => b !== brand)
-              }))}
-            />
-          ))}
-        </FilterSection>
+        {filterOptions.brands.length > 0 && (
+          <FilterSection title="Brand">
+            {filterOptions.brands.map(brand => (
+              <CheckboxFilter
+                key={brand}
+                label={brand}
+                checked={filters.brands.includes(brand)}
+                onChange={(checked) => setFilters(prev => ({
+                  ...prev,
+                  brands: checked ? [...prev.brands, brand] : prev.brands.filter((b: string) => b !== brand)
+                }))}
+              />
+            ))}
+          </FilterSection>
+        )}
 
         <FilterSection title="Price Range">
           <div className="px-1">
@@ -277,8 +259,8 @@ const HardwareDeals = () => {
               <div
                 className="absolute h-full bg-red-600 rounded-lg"
                 style={{
-                  left: `${((filters.minPrice - priceRange.min) / (priceRange.max - priceRange.min)) * 100}%`,
-                  right: `${100 - ((filters.maxPrice - priceRange.min) / (priceRange.max - priceRange.min)) * 100}%`
+                  left: `${((filters.minPrice - priceRange.min) / (Math.max(1, priceRange.max - priceRange.min))) * 100}%`,
+                  right: `${100 - ((filters.maxPrice - priceRange.min) / (Math.max(1, priceRange.max - priceRange.min))) * 100}%`
                 }}
               />
 
@@ -324,7 +306,7 @@ const HardwareDeals = () => {
                   onClick={() => handlePriceModalOpen('min')}
                   title="Click to edit"
                 >
-                  ${filters.minPrice}
+                  ${Math.round(filters.minPrice)}
                 </span>
               )}
 
@@ -348,26 +330,28 @@ const HardwareDeals = () => {
                   onClick={() => handlePriceModalOpen('max')}
                   title="Click to edit"
                 >
-                  ${filters.maxPrice}
+                  ${Math.round(filters.maxPrice)}
                 </span>
               )}
             </div>
           </div>
         </FilterSection>
 
-        <FilterSection title="Condition">
-          {['New', 'Refurbished', 'Open Box'].map(cond => (
-            <CheckboxFilter
-              key={cond}
-              label={cond}
-              checked={filters.conditions.includes(cond)}
-              onChange={(checked) => setFilters(prev => ({
-                ...prev,
-                conditions: checked ? [...prev.conditions, cond] : prev.conditions.filter(c => c !== cond)
-              }))}
-            />
-          ))}
-        </FilterSection>
+        {filterOptions.conditions.length > 0 && (
+          <FilterSection title="Condition">
+            {filterOptions.conditions.map(cond => (
+              <CheckboxFilter
+                key={cond}
+                label={cond}
+                checked={filters.conditions.includes(cond)}
+                onChange={(checked) => setFilters(prev => ({
+                  ...prev,
+                  conditions: checked ? [...prev.conditions, cond] : prev.conditions.filter((c: string) => c !== cond)
+                }))}
+              />
+            ))}
+          </FilterSection>
+        )}
 
         <FilterSection title="Rating">
           {[5, 4, 3, 2, 1].map((stars) => (
@@ -419,6 +403,7 @@ const HardwareDeals = () => {
                   onChange={(e) => setFilters(prev => ({ ...prev, sort: e.target.value }))}
                 >
                   <option value="featured">Featured</option>
+                  <option value="category">Category</option>
                   <option value="price_asc">Price: Low to High</option>
                   <option value="price_desc">Price: High to Low</option>
                   <option value="rating_desc">Rating: High to Low</option>

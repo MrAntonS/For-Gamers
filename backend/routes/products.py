@@ -49,6 +49,9 @@ def get_products():
     platforms_filter = request.args.get('platforms', '')
     platforms_list = platforms_filter.split(',') if platforms_filter else []
 
+    conditions_filter = request.args.get('conditions', '')
+    conditions_list = conditions_filter.split(',') if conditions_filter else []
+
     # Determine what to fetch
     fetch_games = True
     fetch_hardware = True
@@ -61,17 +64,17 @@ def get_products():
         
     # Refine based on checkboxes
     if categories_list:
-        if 'Game' not in categories_list and 'Consoles' not in categories_list:
-            if 'Game' not in categories_list:
-                fetch_games = False
-        
-        has_hardware_cat = any(c in categories_list for c in ['Hardware', 'Components', 'Peripherals', 'Consoles'])
-        if not has_hardware_cat and 'Hardware' not in categories_list:
-            fetch_hardware = False
+        fetch_games = 'Game' in categories_list
+        # If 'Hardware' is selected or any specific hardware category is selected
+        fetch_hardware = any(c != 'Game' for c in categories_list)
 
     # Implicitly disable hardware if filtering by game-specific attributes
     if genres_list or platforms_list or years_list:
         fetch_hardware = False
+        
+    # Implicitly disable games if filtering by hardware-specific attributes
+    if conditions_list:
+        fetch_games = False
         
     # Filter Games by Brand (All games are currently assumed to be 'Steam')
     if brands_list and 'Steam' not in brands_list:
@@ -143,6 +146,18 @@ def get_products():
         # Brand filter
         if brands_list:
             query = query.filter(Hardware.brand.in_(brands_list))
+            
+        # Category filter (Hardware specific)
+        if categories_list:
+            # Filter by category_name if it matches something in categories_list
+            # Note: 'Hardware' is a meta-category, might be in categories_list
+            hardware_cats = [c for c in categories_list if c != 'Hardware' and c != 'Game']
+            if hardware_cats:
+                query = query.filter(Hardware.category_name.in_(hardware_cats))
+        
+        # Condition filter
+        if conditions_list:
+            query = query.filter(Hardware.condition.in_(conditions_list))
         
         hardware_list = query.all()
         
@@ -203,6 +218,8 @@ def get_products():
         all_products.sort(key=lambda x: x['rating'] or 0, reverse=True)
     elif sort_option == 'newest':
          all_products.sort(key=lambda x: x.get('dealLastVerified') or '', reverse=True)
+    elif sort_option == 'category':
+         all_products.sort(key=lambda x: x.get('categoryName') or x.get('category') or '')
     else: # featured
         all_products.sort(key=lambda x: x.get('dealScore', 0), reverse=True)
 
@@ -266,6 +283,7 @@ def get_filters():
     # 2. Process Hardware from Database
     hardware_brands_set = set()
     hardware_categories_set = set()
+    hardware_conditions_set = set()
     
     hardware_items = Hardware.query.filter(Hardware.is_active == True).all()
     has_hardware = len(hardware_items) > 0
@@ -278,7 +296,10 @@ def get_filters():
         # Categories
         if item.category_name:
             hardware_categories_set.add(item.category_name)
-        hardware_categories_set.add('Hardware')  # General category
+        
+        # Conditions
+        if item.condition:
+            hardware_conditions_set.add(item.condition)
             
         # Price
         p = item.price if item.price is not None else 0
@@ -292,8 +313,10 @@ def get_filters():
     
     # Combine Categories
     categories = list(hardware_categories_set)
-    if has_games and 'Game' not in categories:
+    if has_games:
         categories.append('Game')
+    if has_hardware:
+        categories.append('Hardware')
         
     # Handle case with no data
     if min_p == float('inf'): min_p = 0
@@ -305,6 +328,7 @@ def get_filters():
         "years": sorted(list(years_set), reverse=True),
         "brands": sorted(brands),
         "categories": sorted(categories),
+        "conditions": sorted(list(hardware_conditions_set)),
         "price_min": min_p,
         "price_max": max_p
     })
