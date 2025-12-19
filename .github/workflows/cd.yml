@@ -127,14 +127,15 @@ jobs:
             done
 
             # Create/refresh a local env file for docker compose.
+            # Quote values to prevent shell variable expansion
             umask 077
             {
-              printf 'SECRET_KEY=%s\n' "$(decode "$SECRET_KEY_B64")"
-              printf 'POSTGRES_PASSWORD=%s\n' "$(decode "$POSTGRES_PASSWORD_B64")"
-              printf 'STEAM_API_KEY=%s\n' "$(decode "$STEAM_API_KEY_B64")"
-              printf 'EBAY_CLIENT_ID=%s\n' "$(decode "$EBAY_CLIENT_ID_B64")"
-              printf 'EBAY_CLIENT_SECRET=%s\n' "$(decode "$EBAY_CLIENT_SECRET_B64")"
-              printf 'EBAY_API_ENV=%s\n' "$(decode "$EBAY_API_ENV_B64")"
+              printf 'SECRET_KEY="%s"\n' "$(decode "$SECRET_KEY_B64")"
+              printf 'POSTGRES_PASSWORD="%s"\n' "$(decode "$POSTGRES_PASSWORD_B64")"
+              printf 'STEAM_API_KEY="%s"\n' "$(decode "$STEAM_API_KEY_B64")"
+              printf 'EBAY_CLIENT_ID="%s"\n' "$(decode "$EBAY_CLIENT_ID_B64")"
+              printf 'EBAY_CLIENT_SECRET="%s"\n' "$(decode "$EBAY_CLIENT_SECRET_B64")"
+              printf 'EBAY_API_ENV="%s"\n' "$(decode "$EBAY_API_ENV_B64")"
             } > .env
 
             # Load new images
