@@ -244,6 +244,19 @@ class Hardware(db.Model):
             except:
                 seller_data = None
         
+        # Calculate rating based on seller feedback percentage
+        rating = 0
+        if seller_data and seller_data.get('feedbackPercentage'):
+            try:
+                feedback = float(seller_data.get('feedbackPercentage', 0))
+                if feedback >= 99: rating = 5
+                elif feedback >= 97: rating = 4.5
+                elif feedback >= 95: rating = 4
+                elif feedback >= 90: rating = 3.5
+                elif feedback > 0: rating = 3
+            except:
+                rating = 0
+
         return {
             'id': self.id,
             'ebayItemId': self.ebay_item_id,
@@ -265,7 +278,7 @@ class Hardware(db.Model):
             'searchTerm': self.search_term,
             'sellerInfo': seller_data,
             'shippingCost': f"${self.shipping_cost:.2f}" if self.shipping_cost is not None else "Free",
-            'rating': None,  # eBay items don't have ratings in the same way
+            'rating': rating,
             'itemGroupId': self.item_group_id,
             'variationSpecifics': json.loads(self.variation_specifics) if self.variation_specifics else None,
             'isParentListing': self.is_parent_listing
