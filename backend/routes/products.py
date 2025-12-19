@@ -9,6 +9,7 @@ from services.steam_service import (
     fetch_cheapshark_deals,
     verify_deal_on_steam,
 )
+from services.ebay_service import verify_hardware_deal
 from models import Game, DealHistory, Hardware, db
 from sqlalchemy import or_
 
@@ -337,12 +338,12 @@ def get_filters():
 def get_product(product_id):
     """
     Get a single product by ID.
-    Handles both DB Games and Mock Hardware.
+    Handles both DB Games and Hardware.
+    Fast return from DB.
     """
     category = request.args.get('category', 'Game')
     
     if category == 'Hardware':
-        # Search in Hardware database
         hardware = Hardware.query.get(product_id)
         if hardware:
             response_dict = hardware.to_dict()
@@ -355,34 +356,16 @@ def get_product(product_id):
                     Hardware.is_active == True
                 ).all()
                 
-                # Calculate scores and sort
-                deals_list = []
-                
-                # Add current item to the list too?
-                # User said: "list them sorted from best to worst". 
-                # Usually "Other Deals" excludes current, but "Available Deals" includes it.
-                # Let's include ALL relevant deals including the current one, so user can comparison shop easily.
-                
                 all_relevant = siblings + [hardware]
-                
+                deals_list = []
                 for sib in all_relevant:
                     sib_dict = sib.to_dict()
                     sib_dict['dealScore'] = sib.calculate_deal_score() # Ensure fresh calc
                     deals_list.append(sib_dict)
                 
-                # Sort best scoe first
-                deals_list.sort(key=lambda x: x['dealScore'], reverse=True)
-                
-                response_dict['listings'] = deals_list
+                deals_list.sort(key=lambda x: x.get('dealScore', 0), reverse=True)
                 response_dict['listings'] = deals_list
             else:
-                # Avoid circular reference by creating a fresh copy or just not including self in a list that self owns?
-                # Actually, `response_dict['listings'] = [response_dict]` IS circular: Dict A -> List -> Dict A
-                # We need to make a COPY of the dict to put in the list, or structure the response differently.
-                # Since `response_dict` represents the "Main Product View", and `listings` are the "Deals", 
-                # it's better if `listings` contains *simplified* deal objects, or at least distinct copies.
-                
-                # Create a fresh dict for the listing entry
                 listing_entry = hardware.to_dict()
                 listing_entry['dealScore'] = hardware.calculate_deal_score()
                 response_dict['listings'] = [listing_entry]
@@ -391,113 +374,55 @@ def get_product(product_id):
         return jsonify({"error": "Product not found"}), 404
         
     else:
-        # Search in DB (Game)
         game = Game.query.get(product_id)
         if game:
-            # Check if we need to verify the deal (older than 24h)
-            should_verify = False
-            
-            # Verify regardless of active status (to catch expired deals coming back or confirm they are still expired)
-            if not game.deal_last_verified:
-                should_verify = True
-            else:
-                # Check if > 24 hours ago
-                # Ensure we compare timezone-aware datetimes
-                now_utc = datetime.now(timezone.utc)
-                
-                # deal_last_verified might be naive or aware depending on DB driver
-                # If naive, assume UTC. If aware, convert to UTC.
-                last_ver = game.deal_last_verified
-                if last_ver:
-                    if last_ver.tzinfo is None:
-                        last_ver = last_ver.replace(tzinfo=timezone.utc)
-                    else:
-                        last_ver = last_ver.astimezone(timezone.utc)
-                
-                diff = now_utc - last_ver
-                if diff.total_seconds() > 86400: # 24 hours
-                    should_verify = True
-            
-            # EXTRA SAFETY: If game claims to be active but end date is in the past, FORCE verify
-            # This fixes the issue where buggy logic might have marked it active with a past date
-            if not should_verify and game.is_active and game.deal_ends_at:
-                end_date = game.deal_ends_at
-                # normalized comparison
-                if end_date.tzinfo is None:
-                     end_date = end_date.replace(tzinfo=timezone.utc)
-                else:
-                     end_date = end_date.astimezone(timezone.utc)
-                
-                if end_date < now_utc:
-                     should_verify = True
-                     print(f"Force verifying {game.title}: Active but expired end date")
-            
-            # CHECK EXPIRED DEALS: If user clicks on an expired deal, we should check it ONE TIME 
-            # to see if it's still expired or if a new sale started.
-            if not should_verify and not game.is_active:
-                 # If we haven't checked it in 24 hours, check it now
-                 if not last_ver:
-                      should_verify = True
-                 else:
-                      diff = now_utc - last_ver
-                      if diff.total_seconds() > 86400:
-                           should_verify = True
-            
-            if should_verify and game.steam_id:
-                print(f"Verification needed for {game.title} (active: {game.is_active}, last verified: {game.deal_last_verified})")
-                
-                # Run verification
-                result = verify_deal_on_steam(game.steam_id)
-                
-                if result:
-                    game.deal_last_verified = datetime.now(timezone.utc)
-                    
-                    if result['is_on_sale']:
-                        # Deal is Active or Reactivated
-                        if not game.is_active:
-                             print(f"Reactivating deal for {game.title}!")
-                             
-                        game.price = result['price']
-                        game.original_price = result['original_price']
-                        game.discount = result['discount']
-                        # ALWAYS update the end date. If verification returns None (unknown), we clear the old one.
-                        game.deal_ends_at = result.get('deal_ends_at')
-                        game.is_active = True
-                    else:
-                        # Deal Expired or Still Expired
-                        if game.is_active:
-                            print(f"Deal expired during verification: {game.title}")
-                            
-                        game.is_active = False
-                        game.price = game.original_price
-                        game.discount = 0
-                        game.deal_ends_at = None
-                    
-                    try:
-                        db.session.commit()
-                    except Exception as e:
-                        db.session.rollback()
-                        print(f"Error saving verification result: {e}")
-
             return jsonify(game.to_dict())
-            
-        # Fallback: Check hardware if not found in Games (in case category arg is wrong/missing)
-        hardware = Hardware.query.get(product_id)
-        if hardware:
-            # Reuse logic? For now, just recursive call or simple return
-            # Let's just return basic info here if category was wrong
-             return jsonify(hardware.to_dict())
-            
         return jsonify({"error": "Product not found"}), 404
 
 @products_bp.route('/api/products/<int:product_id>/verify', methods=['POST'])
-def verify_deal_endpoint(product_id):
-    """Trigger a verification check for a specific deal"""
+def verify_product(product_id):
+    """
+    Verify a deal in the background (called by frontend on click/page load).
+    Updates DB and returns the fresh product data.
+    """
     category = request.args.get('category', 'Game')
     
-    if category == 'Game':
-        # Logic to verify steam deal...
-        # For now, just return success mock
-        return jsonify({'status': 'verified', 'active': True})
-    
-    return jsonify({'status': 'ignored'}), 200
+    if category == 'Hardware':
+        hardware = verify_hardware_deal(product_id)
+        if hardware:
+            return jsonify(hardware.to_dict())
+        return jsonify({"error": "Failed to verify hardware"}), 400
+        
+    else:
+        game = Game.query.get(product_id)
+        if not game or not game.steam_id:
+            return jsonify({"error": "Game not found"}), 404
+            
+        print(f"Background verification for {game.title} (Steam ID: {game.steam_id})")
+        
+        # Run verification logic
+        result = verify_deal_on_steam(game.steam_id)
+        
+        if result:
+            game.deal_last_verified = datetime.now(timezone.utc)
+            
+            if result['is_on_sale']:
+                game.price = result['price']
+                game.original_price = result['original_price']
+                game.discount = result['discount']
+                game.deal_ends_at = result.get('deal_ends_at')
+                game.is_active = True
+            else:
+                game.is_active = False
+                game.price = game.original_price
+                game.discount = 0
+                game.deal_ends_at = None
+            
+            try:
+                db.session.commit()
+                return jsonify(game.to_dict())
+            except Exception as e:
+                db.session.rollback()
+                return jsonify({"error": str(e)}), 500
+        
+        return jsonify({"error": "Verification failed"}), 500

@@ -56,6 +56,8 @@ def _migrate_sqlite(engine):
             cursor.execute("ALTER TABLE hardware ADD COLUMN variation_specifics TEXT")
         if 'is_parent_listing' not in columns:
             cursor.execute("ALTER TABLE hardware ADD COLUMN is_parent_listing BOOLEAN DEFAULT 0")
+        if 'deal_last_verified' not in columns:
+            cursor.execute("ALTER TABLE hardware ADD COLUMN deal_last_verified DATETIME")
 
     if 'deal_history' not in tables:
         cursor.execute("""
@@ -115,6 +117,8 @@ def _migrate_postgres(engine):
                 conn.execute(text("ALTER TABLE hardware ADD COLUMN variation_specifics TEXT"))
             if 'is_parent_listing' not in cols:
                 conn.execute(text("ALTER TABLE hardware ADD COLUMN is_parent_listing BOOLEAN DEFAULT FALSE"))
+            if 'deal_last_verified' not in cols:
+                conn.execute(text("ALTER TABLE hardware ADD COLUMN deal_last_verified TIMESTAMP WITH TIME ZONE"))
 
         if 'deal_history' not in tables:
             # Use a straightforward CREATE TABLE; id as SERIAL primary key for Postgres

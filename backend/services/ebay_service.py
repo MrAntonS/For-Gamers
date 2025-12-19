@@ -97,6 +97,86 @@ def get_oauth_token():
         return None
 
 
+def get_ebay_item(item_id):
+    """
+    Fetch details for a single eBay item using the Browse API.
+    
+    Args:
+        item_id: eBay Item ID (e.g., "v1|123456789012|0")
+    
+    Returns:
+        Item dictionary or None if error/not found
+    """
+    token = get_oauth_token()
+    if not token:
+        return None
+    
+    try:
+        # eBay Item IDs from Browse API often look like "v1|123456789|0"
+        # We need to URL encode them
+        import urllib.parse
+        encoded_id = urllib.parse.quote(item_id)
+        
+        headers = {
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json',
+            'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US'
+        }
+        
+        url = f"{BROWSE_API_URL}/item/{encoded_id}"
+        response = requests.get(url, headers=headers)
+        
+        if response.status_code == 200:
+            return response.json()
+        elif response.status_code == 404:
+            logger.warning(f"eBay item not found: {item_id}")
+            return None
+        else:
+            logger.error(f"eBay API get_item error: {response.status_code} - {response.text}")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Error fetching eBay item {item_id}: {e}")
+        return None
+
+
+def verify_hardware_deal(hardware_id):
+    """
+    Verify if a hardware deal is still active on eBay and update DB.
+    
+    Returns:
+        The updated hardware model or None
+    """
+    hardware = Hardware.query.get(hardware_id)
+    if not hardware or not hardware.ebay_item_id:
+        return None
+        
+    logger.info(f"Verifying hardware deal: {hardware.title} ({hardware.ebay_item_id})")
+    item_data = get_ebay_item(hardware.ebay_item_id)
+    
+    if not item_data:
+        # If item not found, mark as inactive
+        hardware.is_active = False
+        hardware.deal_last_verified = datetime.now(timezone.utc)
+        hardware.last_updated = datetime.now(timezone.utc)
+        db.session.commit()
+        return hardware
+    
+    # Update with fresh data
+    parsed = parse_ebay_item(item_data, category_name=hardware.category_name, search_term=hardware.search_term)
+    if parsed:
+        for key, value in parsed.items():
+            if key != 'ebay_item_id':
+                setattr(hardware, key, value)
+        
+        hardware.deal_last_verified = datetime.now(timezone.utc)
+        hardware.last_updated = datetime.now(timezone.utc)
+        db.session.commit()
+        return hardware
+        
+    return None
+
+
 def search_ebay_hardware(query, limit=50, category_filter=None):
     """
     Search for hardware products on eBay using the Browse API.
@@ -302,6 +382,33 @@ def parse_ebay_item(item_data, category_name=None, search_term=None):
             if specifics:
                 variation_specifics = json.dumps(specifics)
         
+        # Determine if active - be conservative to avoid false negatives
+        is_active = True
+        
+        # Check listing status first (most reliable for ended listings)
+        listing_status = item_data.get('listingStatus')
+        if listing_status:
+            if listing_status.lower() in ['ended', 'completed', 'sold_out', 'out_of_stock']:
+                is_active = False
+                logger.info(f"Item {item_id} marked inactive due to status: {listing_status}")
+        
+        # Check availabilities if still active
+        if is_active:
+            availabilities = item_data.get('estimatedAvailabilities', [])
+            for a in availabilities:
+                qty_str = a.get('estimatedAvailableQuantity')
+                if qty_str is not None:
+                    try:
+                        if int(qty_str) <= 0:
+                            is_active = False
+                            logger.info(f"Item {item_id} marked inactive due to 0 quantity")
+                            break
+                    except (ValueError, TypeError):
+                        pass
+
+        # If we have an itemGroupHref but no specifics, it might be a variations listing
+        # which sometimes lacks quantity at the top level.
+
         return {
             'ebay_item_id': item_id,
             'title': title,
@@ -316,7 +423,7 @@ def parse_ebay_item(item_data, category_name=None, search_term=None):
             'brand': brand,
             'seller_info': json.dumps(seller_info),
             'shipping_cost': shipping_cost,
-            'is_active': True,
+            'is_active': is_active,
             'deal_ends_at': None,  # eBay doesn't always provide end dates in browse API
             'search_term': search_term,
             'item_group_id': item_group_id,

@@ -168,6 +168,7 @@ class Hardware(db.Model):
     item_group_id = db.Column(db.String(100), nullable=True, index=True)  # eBay item group ID for variations
     variation_specifics = db.Column(db.Text, nullable=True)  # JSON: {"Storage": "4TB", "RAM": "64GB"}
     is_parent_listing = db.Column(db.Boolean, default=False)  # True if this is the main/representative item
+    deal_last_verified = db.Column(db.DateTime(timezone=True), nullable=True) # When we last verified deal is still active
     last_updated = db.Column(db.DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     def calculate_deal_score(self):
@@ -271,6 +272,7 @@ class Hardware(db.Model):
             'dealScore': self.calculate_deal_score(),
             'isActive': self.is_active,
             'lastUpdated': self.last_updated.isoformat() if self.last_updated else None,
+            'dealLastVerified': self.deal_last_verified.isoformat() if self.deal_last_verified else None,
             'dealEndsAt': self.deal_ends_at.isoformat() if self.deal_ends_at else None,
             'category': 'Hardware',
             'categoryName': self.category_name,
