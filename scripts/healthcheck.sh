@@ -22,15 +22,21 @@ fi
 # Load POSTGRES_PASSWORD from .env for the check
 # We can source it or grep it. Sourcing is easier but might have side effects if not careful.
 # Let's grep it to be safe and avoid overwriting current shell vars unexpectedly.
-POSTGRES_PASSWORD=$(grep '^POSTGRES_PASSWORD=' .env | cut -d '=' -f2-)
+POSTGRES_PASSWORD=$(grep '^POSTGRES_PASSWORD=' .env | cut -d '=' -f2- | tr -d '"')
+
+# Determine database name based on environment
+DB_NAME="gamernexus"
+if [ "$DEPLOY_ENV" = "prod" ]; then
+  DB_NAME="gamernexus-prod"
+fi
 
 # Wait for db to be accepting connections and authenticated
-echo "Waiting for db readiness..."
+echo "Waiting for db readiness (database: $DB_NAME)..."
 for i in $(seq 1 30); do
   # Check connectivity AND authentication using psql
   if docker compose --env-file .env -f "$COMPOSE_FILE" exec -T \
       -e PGPASSWORD="$POSTGRES_PASSWORD" \
-      db psql -U postgres -d gamernexus -c "SELECT 1" >/dev/null 2>&1; then
+      db psql -U postgres -d "$DB_NAME" -c "SELECT 1" >/dev/null 2>&1; then
     echo "db is ready and authenticated"
     break
   fi
