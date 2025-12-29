@@ -65,7 +65,7 @@ def run_background_tasks():
                 # 2. Update details for games that miss them
                 try:
                     logger.info("Updating game details...")
-                    update_game_details_systematically(limit=50)
+                    update_game_details_systematically(limit=100)
                 except Exception as e:
                     logger.error(f"Error in Steam details update: {e}", exc_info=True)
                 

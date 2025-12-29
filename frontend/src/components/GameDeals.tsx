@@ -14,6 +14,7 @@ interface GameDeal {
   rating: number;
   description?: string;
   dealLastVerified?: string;
+  releaseYear?: number;
 }
 
 interface Filters {
@@ -133,7 +134,7 @@ const GameDeals = () => {
           sort: appliedFilters.sort,
           genres: appliedFilters.genres.join(','),
           platforms: appliedFilters.platforms.join(','),
-          release_years: appliedFilters.releaseYears.join(',')
+          years: appliedFilters.releaseYears.join(',')
         });
 
         const response = await fetch(`${API_BASE_URL}/api/products?${queryParams.toString()}`);
@@ -151,7 +152,8 @@ const GameDeals = () => {
           image: p.image,
           rating: p.rating,
           description: p.description,
-          dealLastVerified: p.dealLastVerified
+          dealLastVerified: p.dealLastVerified,
+          releaseYear: p.releaseYear
         }));
         setGames(mappedGames);
         setTotalPages(data.total_pages || 1);
@@ -489,6 +491,7 @@ const GameDeals = () => {
                   rating={game.rating}
                   description={game.description}
                   isVerified={!!game.dealLastVerified}
+                  releaseYear={game.releaseYear}
                   className="h-[350px]"
                 />
               ))}

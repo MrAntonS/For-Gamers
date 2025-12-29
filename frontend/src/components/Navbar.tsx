@@ -14,7 +14,6 @@ const Navbar = () => {
     { name: "Min-Max build", href: "/minmax" },
     { name: "Game Deals", href: "/deals/games" },
     { name: "Hardware Deals", href: "/deals/hardware" },
-    { name: "Best Accessories", href: "#" },
   ];
 
   const handleSearch = (e: React.FormEvent) => {

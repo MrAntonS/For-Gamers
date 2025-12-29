@@ -12,7 +12,7 @@ on:
         options:
           - dev
           - prod
-        default: dev
+        default: prod
       ref:
         description: Git ref (branch/tag/SHA) to deploy
         required: true
@@ -76,7 +76,7 @@ jobs:
           EBAY_CLIENT_ID: ${{ secrets.EBAY_CLIENT_ID }}
           EBAY_CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
           EBAY_API_ENV: ${{ secrets.EBAY_API_ENV }}
-          DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}
+          DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'prod' }}
         run: |
           set -euo pipefail
 
@@ -94,7 +94,7 @@ jobs:
 
             decode() { printf '%s' "$1" | base64 -d; }
 
-            DEPLOY_ENV="${DEPLOY_ENV:-dev}"
+            DEPLOY_ENV="${DEPLOY_ENV:-prod}"
             COMPOSE_FILE="docker-compose.yml"
             if [ "$DEPLOY_ENV" = "prod" ]; then
               COMPOSE_FILE="docker-compose.prod.yml"
@@ -156,7 +156,7 @@ jobs:
 
       - name: Run Health Checks
         env:
-          DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}
+          DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'prod' }}
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
             ${{ secrets.ORACLE_VM_USER }}@${{ secrets.ORACLE_VM_IP }} \
@@ -165,7 +165,7 @@ jobs:
       - name: Rollback on Failure
         if: failure()
         env:
-          DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'dev' }}
+          DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'prod' }}
         run: |
           echo "Health check or deployment failed. Initiating rollback..."
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa \
@@ -173,7 +173,7 @@ jobs:
             "DEPLOY_ENV='$DEPLOY_ENV' bash -s" << 'EOF'
             set -euo pipefail
             
-            DEPLOY_ENV="${DEPLOY_ENV:-dev}"
+            DEPLOY_ENV="${DEPLOY_ENV:-prod}"
             COMPOSE_FILE="docker-compose.yml"
             if [ "$DEPLOY_ENV" = "prod" ]; then
               COMPOSE_FILE="docker-compose.prod.yml"

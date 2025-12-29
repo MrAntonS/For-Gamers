@@ -99,16 +99,30 @@ const SearchResults = () => {
       setLoading(true);
       try {
         // Build category filter based on active filters
-        let categoryParam = '';
+        let category = '';
         if (hasGameFilters && !hasHardwareFilters) {
-          categoryParam = '&category=Game';
+          category = 'Game';
         } else if (hasHardwareFilters && !hasGameFilters) {
-          categoryParam = '&category=Hardware';
+          category = 'Hardware';
         }
 
-        const response = await fetch(
-          `${API_BASE_URL}/api/products?search=${encodeURIComponent(searchQuery)}&page=${currentPage}&limit=18${categoryParam}`
-        );
+        const queryParams = new URLSearchParams({
+          search: searchQuery,
+          page: currentPage.toString(),
+          limit: '18',
+          genres: filters.genres.join(','),
+          platforms: filters.platforms.join(','),
+          years: filters.releaseYears.join(','),
+          brands: filters.brands.join(','),
+          rating: (filters.ratings.length > 0 ? Math.min(...filters.ratings) : 0).toString(),
+          max_price: filters.priceRange.toString()
+        });
+
+        if (category) {
+          queryParams.append('category', category);
+        }
+
+        const response = await fetch(`${API_BASE_URL}/api/products?${queryParams.toString()}`);
         if (!response.ok) {
           throw new Error('Failed to fetch products');
         }

@@ -27,6 +27,7 @@ export interface ProductCardProps {
   ebayItemId?: string;
   itemGroupId?: string;
   hasVariations?: boolean;
+  releaseYear?: number;
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({
@@ -52,7 +53,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
   steam_id,
   ebayItemId,
   itemGroupId,
-  hasVariations = false
+  hasVariations = false,
+  releaseYear
 }) => {
   const { addToCart } = useCart();
   const navigate = useNavigate();
@@ -113,6 +115,11 @@ const ProductCard: React.FC<ProductCardProps> = ({
           <div className="bg-red-600 text-white text-[10px] 2xl:text-xs font-bold px-1.5 py-0.5 2xl:px-2 2xl:py-1 rounded">
             {category}
           </div>
+          {releaseYear && (
+            <div className="bg-gray-800 text-white text-[10px] 2xl:text-xs font-bold px-1.5 py-0.5 2xl:px-2 2xl:py-1 rounded border border-gray-600">
+              {releaseYear}
+            </div>
+          )}
           {isGrouped && groupCount > 1 && (
             <div className="bg-blue-600 text-white text-[10px] 2xl:text-xs font-bold px-1.5 py-0.5 2xl:px-2 2xl:py-1 rounded">
               {groupCount} Deals

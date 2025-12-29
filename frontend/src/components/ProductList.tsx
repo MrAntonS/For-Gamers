@@ -18,6 +18,8 @@ interface Product {
   itemGroupId?: string;
   hasVariations?: boolean;
   steam_id?: number;
+  releaseYear?: number;
+  dealLastVerified?: string;
 }
 
 interface Filters {
@@ -401,6 +403,8 @@ const ProductList = () => {
                   image={product.image}
                   category={product.category}
                   rating={product.rating}
+                  isVerified={!!product.dealLastVerified}
+                  releaseYear={product.releaseYear}
                   brand={product.brand}
                   className="h-[350px]"
                   enableHoverReveal={true}
