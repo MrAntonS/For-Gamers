@@ -155,23 +155,17 @@ def create_app():
             app.logger.exception("Error running migrations")
 
         try:
-            from routes import products, minmax, auth, external, variations
+            from routes import products, minmax, auth, external
         except ImportError:
             # Fallback if running from a different context
-            from .routes import products, minmax, auth, external, variations
+            from .routes import products, minmax, auth, external
         
         app.register_blueprint(products.products_bp)
         app.register_blueprint(minmax.minmax_bp)
         app.register_blueprint(auth.auth_bp)
         app.register_blueprint(external.external_bp)
-        app.register_blueprint(variations.variations_bp)
 
     # Start background thread
-    # IMPORTANT: In production with Gunicorn, we use a separate worker process (background_worker.py)
-    # This thread is only for development mode when running Flask directly
-    # Check if we're running under Gunicorn
-    is_gunicorn = "gunicorn" in os.environ.get("SERVER_SOFTWARE", "")
-    
     # When Flask debug reloader is on, only start the background thread in the
     # reloader's main process to avoid running it twice.
     debug_mode = (
@@ -179,10 +173,7 @@ def create_app():
         or os.environ.get("FLASK_ENV") == "development"
     )
 
-    # Only start background thread if:
-    # 1. NOT running under Gunicorn (production uses separate worker)
-    # 2. In debug mode, only in the main reloader process
-    if not is_gunicorn and ((not debug_mode) or os.environ.get("WERKZEUG_RUN_MAIN") == "true"):
+    if (not debug_mode) or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         # Check if thread is already running to avoid duplicates in same process
         is_running = False
         for t in threading.enumerate():
@@ -192,7 +183,7 @@ def create_app():
         
         if not is_running:
             # Use file-based lock to prevent multiple processes from starting the task
-            # This handles multiple Flask processes in development
+            # This handles Gunicorn workers or multiple Flask processes
             lock_file = os.path.join(app.instance_path, '.background_task.lock')
             
             try:
@@ -228,14 +219,12 @@ def create_app():
                     print("Background Steam fetch thread started (acquired lock - Windows)")
                 except (IOError, OSError, ImportError):
                     print("Background task already running in another process, skipping")
-    elif is_gunicorn:
-        print("Running under Gunicorn - background tasks handled by separate worker process")
 
     return app
 
 def background_task(app, lock_fd=None):
     """
-    Background task to continuously fetch games from Steam and hardware from eBay.
+    Background task to continuously fetch games from Steam.
     Holds a file lock to ensure only one instance runs across processes.
     """
     import time
@@ -245,10 +234,6 @@ def background_task(app, lock_fd=None):
         verify_and_update_stale_deals,
         reactivate_deals_from_cheapshark
     )
-    from services.ebay_service import (
-        fetch_all_hardware_deals,
-        deactivate_old_hardware_listings
-    )
     
     # Keep lock_fd open to maintain the lock
     try:
@@ -256,12 +241,10 @@ def background_task(app, lock_fd=None):
             first_run = True
             run_count = 0
             while True:
-                print("Running background fetch (Steam + eBay)...")
+                print("Running background Steam fetch...")
                 
                 # Fetch more pages on first run to populate DB
                 pages = 50 if first_run else 5
-                
-                # === STEAM GAME DEALS ===
                 
                 # 1. Fetch deals from CheapShark (this will also reactivate any deals that come back)
                 try:
@@ -289,24 +272,6 @@ def background_task(app, lock_fd=None):
                         reactivate_deals_from_cheapshark()
                     except Exception as e:
                         print(f"Error reactivating deals: {e}")
-                
-                # === EBAY HARDWARE DEALS ===
-                
-                # 5. Fetch hardware deals from eBay
-                # On first run, fetch more items to populate the database
-                # On subsequent runs, fetch fewer items to keep deals fresh
-                try:
-                    items_per_cat = 20 if first_run else 5
-                    fetch_all_hardware_deals(items_per_category=items_per_cat)
-                except Exception as e:
-                    print(f"Error fetching eBay hardware: {e}")
-                
-                # 6. Every 3rd run (~30 minutes), deactivate old eBay listings
-                if run_count % 3 == 0:
-                    try:
-                        deactivate_old_hardware_listings(hours_threshold=48)
-                    except Exception as e:
-                        print(f"Error deactivating old hardware: {e}")
                 
                 first_run = False
                 # Sleep for 10 minutes

@@ -34,30 +34,6 @@ def _migrate_sqlite(engine):
             cursor.execute("ALTER TABLE games ADD COLUMN deal_last_verified DATETIME")
         if 'deal_ends_at' not in columns:
             cursor.execute("ALTER TABLE games ADD COLUMN deal_ends_at DATETIME")
-        if 'platforms' not in columns:
-            cursor.execute("ALTER TABLE games ADD COLUMN platforms VARCHAR(255)")
-        if 'release_date' not in columns:
-            cursor.execute("ALTER TABLE games ADD COLUMN release_date VARCHAR(50)")
-        if 'release_year' not in columns:
-            cursor.execute("ALTER TABLE games ADD COLUMN release_year INTEGER")
-    
-    if 'hardware' in tables:
-        cursor.execute("PRAGMA table_info(hardware)")
-        columns = [row[1] for row in cursor.fetchall()]
-        
-        if 'search_term' not in columns:
-            cursor.execute("ALTER TABLE hardware ADD COLUMN search_term VARCHAR(255)")
-        if 'seller_info' not in columns:
-            cursor.execute("ALTER TABLE hardware ADD COLUMN seller_info TEXT")
-        if 'item_group_id' not in columns:
-            cursor.execute("ALTER TABLE hardware ADD COLUMN item_group_id VARCHAR(100)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_hardware_item_group_id ON hardware(item_group_id)")
-        if 'variation_specifics' not in columns:
-            cursor.execute("ALTER TABLE hardware ADD COLUMN variation_specifics TEXT")
-        if 'is_parent_listing' not in columns:
-            cursor.execute("ALTER TABLE hardware ADD COLUMN is_parent_listing BOOLEAN DEFAULT 0")
-        if 'deal_last_verified' not in columns:
-            cursor.execute("ALTER TABLE hardware ADD COLUMN deal_last_verified DATETIME")
 
     if 'deal_history' not in tables:
         cursor.execute("""
@@ -96,29 +72,6 @@ def _migrate_postgres(engine):
                 conn.execute(text("ALTER TABLE games ADD COLUMN deal_last_verified TIMESTAMP WITH TIME ZONE"))
             if 'deal_ends_at' not in cols:
                 conn.execute(text("ALTER TABLE games ADD COLUMN deal_ends_at TIMESTAMP WITH TIME ZONE"))
-            if 'platforms' not in cols:
-                conn.execute(text("ALTER TABLE games ADD COLUMN platforms VARCHAR(255)"))
-            if 'release_date' not in cols:
-                conn.execute(text("ALTER TABLE games ADD COLUMN release_date VARCHAR(50)"))
-            if 'release_year' not in cols:
-                conn.execute(text("ALTER TABLE games ADD COLUMN release_year INTEGER"))
-
-        if 'hardware' in tables:
-            cols = {c['name'] for c in insp.get_columns('hardware')}
-            
-            if 'search_term' not in cols:
-                conn.execute(text("ALTER TABLE hardware ADD COLUMN search_term VARCHAR(255)"))
-            if 'seller_info' not in cols:
-                conn.execute(text("ALTER TABLE hardware ADD COLUMN seller_info TEXT"))
-            if 'item_group_id' not in cols:
-                conn.execute(text("ALTER TABLE hardware ADD COLUMN item_group_id VARCHAR(100)"))
-                conn.execute(text("CREATE INDEX IF NOT EXISTS idx_hardware_item_group_id ON hardware(item_group_id)"))
-            if 'variation_specifics' not in cols:
-                conn.execute(text("ALTER TABLE hardware ADD COLUMN variation_specifics TEXT"))
-            if 'is_parent_listing' not in cols:
-                conn.execute(text("ALTER TABLE hardware ADD COLUMN is_parent_listing BOOLEAN DEFAULT FALSE"))
-            if 'deal_last_verified' not in cols:
-                conn.execute(text("ALTER TABLE hardware ADD COLUMN deal_last_verified TIMESTAMP WITH TIME ZONE"))
 
         if 'deal_history' not in tables:
             # Use a straightforward CREATE TABLE; id as SERIAL primary key for Postgres
@@ -213,8 +166,6 @@ if __name__ == '__main__':
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-    from models import db
-    db.init_app(app)
+    db = SQLAlchemy(app)
 
-    with app.app_context():
-        run_migrations(app)
+    run_migrations(app)

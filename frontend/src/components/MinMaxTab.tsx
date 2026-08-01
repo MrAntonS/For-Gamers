@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
 import { FaMicrochip, FaMemory, FaDesktop, FaSearch, FaTimes, FaArrowLeft, FaCheck } from 'react-icons/fa';
 
@@ -51,7 +50,6 @@ interface GameDetail {
 type SetupMode = 'minimal' | 'recommended';
 
 const MinMaxTab = () => {
-  const navigate = useNavigate();
   const [games, setGames] = useState<Game[]>([]);
   const [selectedGames, setSelectedGames] = useState<Game[]>([]);
   const [recommendation, setRecommendation] = useState<RecommendationResponse | null>(null);
@@ -73,20 +71,20 @@ const MinMaxTab = () => {
   const fetchGames = useCallback(async (offset: number = 0, search: string = '') => {
     if (gamesLoading) return;
     setGamesLoading(true);
-
+    
     try {
       const params = new URLSearchParams({
         limit: GAMES_PER_PAGE.toString(),
         offset: offset.toString(),
       });
       if (search) params.append('q', search);
-
+      
       const response = await fetch(`${API_BASE_URL}/api/minmax/games?${params}`);
       if (!response.ok) {
         throw new Error(`Server error: ${response.status}`);
       }
       const data = await response.json();
-
+      
       if (offset === 0) {
         setGames(data);
       } else {
@@ -97,7 +95,7 @@ const MinMaxTab = () => {
           return [...prev, ...newGames];
         });
       }
-
+      
       setHasMoreGames(data.length === GAMES_PER_PAGE);
     } catch (err) {
       console.error('Error fetching games:', err);
@@ -129,7 +127,7 @@ const MinMaxTab = () => {
   const handleScroll = useCallback(() => {
     const container = gamesContainerRef.current;
     if (!container || gamesLoading || !hasMoreGames) return;
-
+    
     const { scrollTop, scrollHeight, clientHeight } = container;
     if (scrollTop + clientHeight >= scrollHeight - 200) {
       fetchGames(games.length, searchTerm);
@@ -228,7 +226,7 @@ const MinMaxTab = () => {
               />
             </div>
 
-            <div
+            <div 
               ref={gamesContainerRef}
               onScroll={handleScroll}
               className="flex-1 overflow-y-auto pr-2 flex flex-wrap gap-4 content-start pb-4"
@@ -237,8 +235,9 @@ const MinMaxTab = () => {
                 <div
                   key={game.id}
                   onClick={() => toggleGameSelection(game)}
-                  className={`relative w-[120px] h-[160px] rounded-lg overflow-hidden cursor-pointer transition-all duration-200 border-2 shadow-lg hover:shadow-xl hover:scale-[1.02] ${selectedGameIds.has(game.id) ? 'border-[#00ff88]' : 'border-transparent'
-                    }`}
+                  className={`relative w-[120px] h-[160px] rounded-lg overflow-hidden cursor-pointer transition-all duration-200 border-2 shadow-lg hover:shadow-xl hover:scale-[1.02] ${
+                    selectedGameIds.has(game.id) ? 'border-[#00ff88]' : 'border-transparent'
+                  }`}
                 >
                   <img
                     src={game.image}
@@ -297,10 +296,11 @@ const MinMaxTab = () => {
             <button
               onClick={() => getRecommendation()}
               disabled={loading || selectedGames.length === 0}
-              className={`w-full mt-6 p-4 rounded-lg text-lg font-bold transition-all shrink-0 ${selectedGames.length > 0
-                  ? 'bg-[#00ff88] text-black hover:bg-[#00cc6a]'
+              className={`w-full mt-6 p-4 rounded-lg text-lg font-bold transition-all shrink-0 ${
+                selectedGames.length > 0 
+                  ? 'bg-[#00ff88] text-black hover:bg-[#00cc6a]' 
                   : 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                }`}
+              }`}
             >
               {loading ? 'Analyzing...' : 'Get Optimal Setup'}
             </button>
@@ -360,12 +360,6 @@ const MinMaxTab = () => {
                 </div>
                 <div className="text-xl md:text-2xl font-bold mb-1 truncate" title={activeBuild.gpu_name}>{activeBuild.gpu_name}</div>
                 <div className="text-gray-400 text-sm">Score: {activeBuild.gpu_score} • Tier: {activeBuild.tier}</div>
-                <button
-                  onClick={() => navigate(`/search?q=${encodeURIComponent(activeBuild.gpu_name)}`)}
-                  className="mt-4 w-full bg-[#00ff88]/10 text-[#00ff88] border border-[#00ff88]/30 rounded-lg py-2 text-sm font-bold flex items-center justify-center gap-2 hover:bg-[#00ff88]/20 transition-all group"
-                >
-                  <FaSearch size={12} className="group-hover:scale-110 transition-transform" /> Search similar
-                </button>
               </div>
             </div>
 
@@ -377,12 +371,6 @@ const MinMaxTab = () => {
                 </div>
                 <div className="text-xl md:text-2xl font-bold mb-1 truncate" title={activeBuild.cpu_name}>{activeBuild.cpu_name}</div>
                 <div className="text-gray-400 text-sm">Score: {activeBuild.cpu_score}</div>
-                <button
-                  onClick={() => navigate(`/search?q=${encodeURIComponent(activeBuild.cpu_name)}`)}
-                  className="mt-4 w-full bg-[#00ccff]/10 text-[#00ccff] border border-[#00ccff]/30 rounded-lg py-2 text-sm font-bold flex items-center justify-center gap-2 hover:bg-[#00ccff]/20 transition-all group"
-                >
-                  <FaSearch size={12} className="group-hover:scale-110 transition-transform" /> Search similar
-                </button>
               </div>
             </div>
 
@@ -396,12 +384,6 @@ const MinMaxTab = () => {
                   {activeBuild.ram_gb ? `${activeBuild.ram_gb} GB` : 'Unknown'}
                 </div>
                 <div className="text-gray-400 text-sm">{activeBuild.description}</div>
-                <button
-                  onClick={() => navigate(`/search?q=${encodeURIComponent(activeBuild.ram_gb + 'GB RAM')}`)}
-                  className="mt-4 w-full bg-[#ff0088]/10 text-[#ff0088] border border-[#ff0088]/30 rounded-lg py-2 text-sm font-bold flex items-center justify-center gap-2 hover:bg-[#ff0088]/20 transition-all group"
-                >
-                  <FaSearch size={12} className="group-hover:scale-110 transition-transform" /> Search similar
-                </button>
               </div>
             </div>
           </div>
@@ -454,8 +436,9 @@ const MinMaxTab = () => {
                   <div
                     key={game.id}
                     onClick={() => setActiveIndex(index)}
-                    className={`relative shrink-0 w-[260px] h-[380px] md:w-[280px] md:h-[420px] rounded-2xl bg-cover bg-center transition-all duration-300 ease-out cursor-pointer flex flex-col justify-end p-6 border snap-center ${isActive ? 'border-[#00ff88] shadow-[0_20px_50px_rgba(0,0,0,0.7)] scale-100 opacity-100' : 'border-[#444] shadow-[0_10px_30px_rgba(0,0,0,0.5)] scale-95 opacity-60 hover:opacity-100'
-                      }`}
+                    className={`relative shrink-0 w-[260px] h-[380px] md:w-[280px] md:h-[420px] rounded-2xl bg-cover bg-center transition-all duration-300 ease-out cursor-pointer flex flex-col justify-end p-6 border snap-center ${
+                      isActive ? 'border-[#00ff88] shadow-[0_20px_50px_rgba(0,0,0,0.7)] scale-100 opacity-100' : 'border-[#444] shadow-[0_10px_30px_rgba(0,0,0,0.5)] scale-95 opacity-60 hover:opacity-100'
+                    }`}
                     style={{
                       backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0) 40%, rgba(0,0,0,0.95) 90%), url(${game.image})`,
                     }}
